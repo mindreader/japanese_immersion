@@ -25,10 +25,11 @@ defmodule Japanese.Translation do
 
   @enforce_keys [:text, :usage]
   defstruct [:text, :usage]
+
   @type t :: %__MODULE__{
-    text: String.t(),
-    usage: Japanese.Schemas.Anthropic.Response.Usage.t()
-  }
+          text: String.t(),
+          usage: Japanese.Schemas.Anthropic.Response.Usage.t()
+        }
 
   @doc """
   Translates Japanese text to English.
@@ -71,8 +72,10 @@ defmodule Japanese.Translation do
       case literalness do
         :literal ->
           "Translate this Japanese literally and directly and keep the exact same format as the input except translated. Do not add any additional commentary or explanation or assessment of formality."
+
         :natural ->
           "Translate this Japanese to natural English, making it sound fluent and idiomatic."
+
         _ ->
           "Translate this Japanese to English."
       end
@@ -103,6 +106,7 @@ defmodule Japanese.Translation do
 
   defp call_anthropix(system_prompt, user_text) do
     client = build_client()
+
     Anthropix.chat(
       client,
       model: @model,
@@ -114,6 +118,7 @@ defmodule Japanese.Translation do
     |> case do
       {:ok, anthropix_result} ->
         Response.parse_response(anthropix_result)
+
       {:error, err} ->
         {:error, err}
     end
@@ -121,14 +126,16 @@ defmodule Japanese.Translation do
 
   defp handle_response({:ok, %{content: [%{text: text} | _], usage: usage}}, :ja_to_en),
     do: %__MODULE__{text: text, usage: usage}
+
   defp handle_response({:ok, %{content: [%{text: text} | _]}}, :en_to_ja) when is_binary(text),
     do: %{text: text}
+
   defp handle_response({:ok, %{content: []}}, _),
     do: {:error, :no_content}
+
   defp handle_response({:ok, %{content: _messages}}, _),
     do: {:error, :multiple_messages}
-  defp handle_response({:error, changeset}, _),
-    do: {:error, changeset}
+
   defp handle_response({:error, err}, _),
     do: {:error, err}
 end

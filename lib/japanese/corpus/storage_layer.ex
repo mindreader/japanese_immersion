@@ -214,6 +214,7 @@ defmodule Japanese.Corpus.StorageLayer do
 
   defp delete_file(%__MODULE__{working_directory: wd}, story, filename) do
     file_path = Path.join([wd, story, filename])
+
     case File.rm(file_path) do
       :ok -> :ok
       {:error, :enoent} -> {:error, :enoent}
@@ -230,6 +231,7 @@ defmodule Japanese.Corpus.StorageLayer do
           {:ok, :written} | {:error, term}
   def write_english_translation(storage, story, number, english) do
     filename = page_filename(storage, story, number, :english)
+
     case write_page(storage, story, filename, english) do
       :ok -> {:ok, :written}
       {:error, reason} -> {:error, reason}
@@ -267,13 +269,16 @@ defmodule Japanese.Corpus.StorageLayer do
   Creates a new Japanese page in the given story with the provided text.
   Determines the next available page number and filename, writes the file, and returns {:ok, %Page{}} or {:error, reason}.
   """
-  @spec create_japanese_page(t(), String.t(), String.t()) :: {:ok, Japanese.Corpus.Page.t()} | {:error, term}
+  @spec create_japanese_page(t(), String.t(), String.t()) ::
+          {:ok, Japanese.Corpus.Page.t()} | {:error, term}
   def create_japanese_page(storage, story, text) do
     file_name = next_page_filename(storage, story)
+
     case write_page(storage, story, file_name, text) do
       :ok ->
         number = extract_page_number(file_name)
         {:ok, %Japanese.Corpus.Page{number: number, story: story}}
+
       {:error, reason} ->
         {:error, reason}
     end

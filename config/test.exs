@@ -38,3 +38,5 @@ config :phoenix_live_view,
 
 # Set a fake corpus directory for tests
 config :japanese, :corpus_dir, "<test corpus dir>"
+
+config :japanese, :anthropic_api_key, "dummy-key"

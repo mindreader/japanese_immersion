@@ -63,9 +63,11 @@ defmodule Test.Japanese.Corpus do
     test "creates a new Japanese page with the next available number", %{storage: storage} do
       story = %Story{name: "mystory"}
       expected_page = %Page{number: 3, story: "mystory"}
+
       expect(StorageLayer, :create_japanese_page, 1, fn ^storage, "mystory", "new content" ->
         {:ok, expected_page}
       end)
+
       stub(StorageLayer, :new, fn -> storage end)
       assert {:ok, ^expected_page} = Story.add_japanese_page(story, "new content")
     end
