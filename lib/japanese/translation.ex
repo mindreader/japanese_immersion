@@ -2,9 +2,9 @@ defmodule Japanese.Translation do
   @moduledoc """
   Provides translation functions between Japanese and English using an LLM backend (Anthropic via anthropix).
 
-  ## Functions
-  - `ja_to_en/2`: Japanese to English translation with options for literalness, formality, and extras.
-  - `en_to_ja/2`: English to Japanese translation (future extensibility for options).
+  This module is also a struct representing a translation result, with fields:
+    - :text (the translated text)
+    - :usage (the usage struct)
   """
 
   @model "claude-sonnet-4-20250514"
@@ -23,17 +23,46 @@ defmodule Japanese.Translation do
 
   alias Japanese.Schemas.Anthropic.Response
 
-  defmodule EnglishResponse do
-    @enforce_keys [:text, :usage]
-    defstruct [:text, :usage]
-    @type t :: %__MODULE__{
-      text: String.t(),
-      usage: Response.t()
-    }
+  @enforce_keys [:text, :usage]
+  defstruct [:text, :usage]
+  @type t :: %__MODULE__{
+    text: String.t(),
+    usage: Japanese.Schemas.Anthropic.Response.Usage.t()
+  }
+
+  @doc """
+  Translates Japanese text to English.
+
+  ## Options
+    - `:literalness` - `:literal` or `:natural` (default: `:literal`)
+    - `:translation_notes` - boolean, whether to provide translation notes (default: `false`)
+
+  Returns a map with at least `:text` (the translation), and optionally `:notes`, `:ambiguities`.
+  """
+  @spec ja_to_en(String.t(), ja_to_en_opts()) :: t() | {:error, term()}
+  def ja_to_en(text, opts \\ []) when is_binary(text) and is_list(opts) do
+    opts
+    |> build_ja_to_en_prompt()
+    |> call_anthropix(text)
+    |> handle_response(:ja_to_en)
   end
 
-  @doc false
-  @spec build_ja_to_en_prompt(Keyword.t()) :: String.t()
+  @doc """
+  Translates English text to Japanese.
+
+  ## Options
+    - Currently no options, but may be extended in the future.
+
+  Returns a map with at least `:text` (the translation).
+  """
+  @spec en_to_ja(String.t(), Keyword.t()) :: %{text: String.t()} | {:error, term()}
+  def en_to_ja(text, opts \\ []) when is_binary(text) and is_list(opts) do
+    opts
+    |> build_en_to_ja_prompt()
+    |> call_anthropix(text)
+    |> handle_response(:en_to_ja)
+  end
+
   defp build_ja_to_en_prompt(opts) do
     literalness = Keyword.get(opts, :literalness, :literal)
     translation_notes = Keyword.get(opts, :translation_notes, false)
@@ -58,8 +87,10 @@ defmodule Japanese.Translation do
     base <> extras_part
   end
 
-  @doc false
-  @spec build_client() :: map()
+  defp build_en_to_ja_prompt(_opts) do
+    "Translate this English text to Japanese. Keep the meaning and tone as close as possible."
+  end
+
   defp build_client do
     api_key = Application.fetch_env!(:japanese, :anthropic_api_key)
 
@@ -70,56 +101,34 @@ defmodule Japanese.Translation do
     Anthropix.init(api_key)
   end
 
-  @doc """
-  Translates Japanese text to English.
-
-  ## Options
-    - `:literalness` - `:literal` or `:natural` (default: `:literal`)
-    - `:translation_notes` - boolean, whether to provide translation notes (default: `false`)
-
-  Returns a map with at least `:text` (the translation), and optionally `:notes`, `:ambiguities`.
-  """
-  @spec ja_to_en(String.t(), ja_to_en_opts()) :: EnglishResponse.t() | {:error, term()}
-  def ja_to_en(text, opts \\ []) when is_binary(text) and is_list(opts) do
+  defp call_anthropix(system_prompt, user_text) do
     client = build_client()
-    prompt = build_ja_to_en_prompt(opts)
-
     Anthropix.chat(
       client,
       model: @model,
       messages: [
-        %{role: "user", content: text}
+        %{role: "user", content: user_text}
       ],
-      system: prompt
+      system: system_prompt
     )
     |> case do
       {:ok, anthropix_result} ->
-        case Response.parse_response(anthropix_result) do
-          {:ok, %{content: [%{text: text}], usage: usage}} ->
-            %EnglishResponse{text: text, usage: usage}
-          {:ok, %{content: []}} ->
-            {:error, :no_content}
-          {:ok, %{content: _messages}} ->
-            {:error, :multiple_messages}
-
-          {:error, changeset} ->
-            {:error, changeset}
-        end
+        Response.parse_response(anthropix_result)
       {:error, err} ->
         {:error, err}
     end
   end
 
-  @doc """
-  Translates English text to Japanese.
-
-  ## Options
-    - Currently no options, but may be extended in the future.
-
-  Returns a map with at least `:text` (the translation).
-  """
-  @spec en_to_ja(String.t(), Keyword.t()) :: %{text: String.t()} | {:error, term()}
-  def en_to_ja(text, opts \\ []) when is_binary(text) and is_list(opts) do
-    :unimplemented
-  end
+  defp handle_response({:ok, %{content: [%{text: text} | _], usage: usage}}, :ja_to_en),
+    do: %__MODULE__{text: text, usage: usage}
+  defp handle_response({:ok, %{content: [%{text: text} | _]}}, :en_to_ja) when is_binary(text),
+    do: %{text: text}
+  defp handle_response({:ok, %{content: []}}, _),
+    do: {:error, :no_content}
+  defp handle_response({:ok, %{content: _messages}}, _),
+    do: {:error, :multiple_messages}
+  defp handle_response({:error, changeset}, _),
+    do: {:error, changeset}
+  defp handle_response({:error, err}, _),
+    do: {:error, err}
 end
