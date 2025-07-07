@@ -115,3 +115,11 @@ if config_env() == :prod do
   #
   # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
 end
+
+if config_env() == :prod do
+  config :japanese, corpus_dir: System.fetch_env!("CORPUS_DIR")
+end
+
+if config_env() == :dev do
+  config :japanese, corpus_dir: System.get_env("CORPUS_DIR", "txt")
+end

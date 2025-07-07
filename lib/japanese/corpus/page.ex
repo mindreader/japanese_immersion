@@ -18,10 +18,10 @@ defmodule Japanese.Corpus.Page do
   Delegates to the storage layer to determine the filename and do the write.
   Returns {:ok, :written} on success, {:error, reason} on failure.
   """
-  @spec translate(t, String.t()) :: {:ok, :written} | {:error, term}
-  def translate(%__MODULE__{number: number, story: story}, english) do
+  @spec write_english_translation(t, String.t()) :: {:ok, :written} | {:error, term}
+  def write_english_translation(%__MODULE__{number: number, story: story}, english) do
     StorageLayer.new()
-    |> StorageLayer.write_translation(story, number, english)
+    |> StorageLayer.write_english_translation(story, number, english)
   end
 
   @doc """
