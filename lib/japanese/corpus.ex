@@ -29,22 +29,4 @@ defmodule Japanese.Corpus do
         []
     end
   end
-
-  @doc """
-  Lists all files in the given directory that end with the specified extension.
-  Returns a list of file names as strings.
-  """
-  # TODO this needs to move to Japanese.Corpus.StorageLayer
-  @spec list_files_with_extension(String.t(), String.t()) :: [String.t()]
-  def list_files_with_extension(dir, ext) do
-    with {:ok, entries} <- File.ls(dir) do
-      entries
-      |> Enum.filter(fn entry ->
-        String.ends_with?(entry, ext) &&
-          File.regular?(Path.join(dir, entry))
-      end)
-    else
-      _ -> []
-    end
-  end
 end
