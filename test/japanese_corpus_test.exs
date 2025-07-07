@@ -127,4 +127,22 @@ defmodule Japanese.CorpusTest do
       assert {:error, :enoent} = Page.delete(page)
     end
   end
+
+  describe "Story.delete/1" do
+    setup :verify_on_exit!
+
+    test "deletes a story and all its files", %{storage: storage} do
+      story = %Story{name: "mystory"}
+      expect(StorageLayer, :delete_story, 1, fn ^storage, "mystory" -> :ok end)
+      stub(StorageLayer, :new, fn -> storage end)
+      assert :ok = Story.delete(story)
+    end
+
+    test "returns error if deletion fails", %{storage: storage} do
+      story = %Story{name: "mystory"}
+      expect(StorageLayer, :delete_story, 1, fn ^storage, "mystory" -> {:error, :some_reason} end)
+      stub(StorageLayer, :new, fn -> storage end)
+      assert {:error, :some_reason} = Story.delete(story)
+    end
+  end
 end

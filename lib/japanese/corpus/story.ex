@@ -93,4 +93,14 @@ defmodule Japanese.Corpus.Story do
         {:error, reason}
     end
   end
+
+  @doc """
+  Deletes the story and all its files.
+  Returns :ok if successful, {:error, reason} otherwise.
+  """
+  @spec delete(t) :: :ok | {:error, term}
+  def delete(%__MODULE__{name: name}) do
+    StorageLayer.new()
+    |> StorageLayer.delete_story(name)
+  end
 end

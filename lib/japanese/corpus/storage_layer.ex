@@ -179,16 +179,37 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Deletes a story (subdirectory and all its pages).
+  Deletes a story (subdirectory) and all its files by deleting each file individually, then removing the directory.
+  Returns :ok if all files and the directory are deleted, or {:error, reason} if any error occurs.
   """
-  @spec delete_story(t(), String.t()) :: :ok | {:error, term()}
-  def delete_story(%__MODULE__{working_directory: wd}, story) do
+  @spec delete_story(t(), String.t()) :: :ok | {:error, term}
+  def delete_story(%__MODULE__{working_directory: wd} = storage, story) do
     story_dir = Path.join(wd, story)
 
-    File.rm_rf(story_dir)
-    |> case do
-      {_, []} -> :ok
-      {_, errors} -> {:error, errors}
+    case File.ls(story_dir) do
+      {:ok, files} ->
+        file_results =
+          files
+          |> Enum.map(fn file ->
+            delete_file(storage, story, file)
+          end)
+
+        case Enum.find(file_results, fn res -> res != :ok and res != {:error, :enoent} end) do
+          nil ->
+            case File.rmdir(story_dir) do
+              :ok -> :ok
+              {:error, reason} -> {:error, reason}
+            end
+
+          {:error, reason} ->
+            {:error, reason}
+
+          other ->
+            other
+        end
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -215,6 +236,7 @@ defmodule Japanese.Corpus.StorageLayer do
 
   defp delete_file(%__MODULE__{working_directory: wd}, story, filename) do
     file_path = Path.join([wd, story, filename])
+
     case File.rm(file_path) do
       :ok -> :ok
       {:error, :enoent} -> {:error, :enoent}
