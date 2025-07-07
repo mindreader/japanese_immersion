@@ -105,4 +105,26 @@ defmodule Japanese.CorpusTest do
       assert {:ok, :written} = Page.translate(page, english)
     end
   end
+
+  describe "Page.delete/1" do
+    setup :verify_on_exit!
+
+    test "deletes both Japanese and English files for a page", %{storage: storage} do
+      page = %Page{number: 7, story: "mystory"}
+
+      expect(StorageLayer, :delete_page, 1, fn ^storage, "mystory", 7 -> :ok end)
+      stub(StorageLayer, :new, fn -> storage end)
+
+      assert :ok = Page.delete(page)
+    end
+
+    test "returns error if Japanese file does not exist", %{storage: storage} do
+      page = %Page{number: 8, story: "mystory"}
+
+      expect(StorageLayer, :delete_page, 1, fn ^storage, "mystory", 8 -> {:error, :enoent} end)
+      stub(StorageLayer, :new, fn -> storage end)
+
+      assert {:error, :enoent} = Page.delete(page)
+    end
+  end
 end

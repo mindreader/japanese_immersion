@@ -14,13 +14,22 @@ defmodule Japanese.Corpus.Page do
 
   @doc """
   Adds or updates the English translation for an existing Japanese page.
-  Takes the page struct and the translation text.
+  Takes the page struct and the English translation text.
   Delegates to the storage layer to determine the filename and do the write.
   Returns {:ok, :written} on success, {:error, reason} on failure.
   """
   @spec translate(t, String.t()) :: {:ok, :written} | {:error, term}
-  def translate(%__MODULE__{number: number, story: story}, text) do
+  def translate(%__MODULE__{number: number, story: story}, english) do
     StorageLayer.new()
-    |> StorageLayer.write_translation(story, number, text)
+    |> StorageLayer.write_translation(story, number, english)
+  end
+
+  @doc """
+  Deletes both the Japanese and English page files for this page.
+  Returns :ok or {:error, reason}.
+  """
+  @spec delete(t) :: :ok | {:error, term}
+  def delete(%__MODULE__{number: number, story: story}) do
+    StorageLayer.new() |> StorageLayer.delete_page(story, number)
   end
 end

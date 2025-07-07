@@ -193,12 +193,33 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Deletes a page (file) in a given story.
+  Deletes both the Japanese and English page files for the given story and page number.
+  Returns :ok if the Japanese file is deleted (or already deleted) and the English file is deleted or missing.
+  Returns {:error, :enoent} if the Japanese file does not exist. Returns {:error, reason} for any other error.
   """
-  @spec delete_page(t(), String.t(), String.t()) :: :ok | {:error, term()}
-  def delete_page(%__MODULE__{working_directory: wd}, story, page) do
-    file_path = Path.join([wd, story, page])
-    File.rm(file_path)
+  @spec delete_page(t(), String.t(), integer()) :: :ok | {:error, term}
+  def delete_page(%__MODULE__{} = storage, story, number) do
+    jap_file = page_filename(storage, story, number, :japanese)
+    eng_file = page_filename(storage, story, number, :english)
+    jap_result = delete_file(storage, story, jap_file)
+    eng_result = delete_file(storage, story, eng_file)
+
+    case {jap_result, eng_result} do
+      {:ok, :ok} -> :ok
+      {:ok, {:error, :enoent}} -> :ok
+      {{:error, :enoent}, _} -> {:error, :enoent}
+      {{:error, reason}, _} -> {:error, reason}
+      {_, {:error, reason}} when reason != :enoent -> {:error, reason}
+    end
+  end
+
+  defp delete_file(%__MODULE__{working_directory: wd}, story, filename) do
+    file_path = Path.join([wd, story, filename])
+    case File.rm(file_path) do
+      :ok -> :ok
+      {:error, :enoent} -> {:error, :enoent}
+      {:error, reason} -> {:error, reason}
+    end
   end
 
   @doc """
