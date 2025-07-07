@@ -50,18 +50,8 @@ defmodule Japanese.Corpus.Story do
   Returns {:ok, %Page{}} on success, {:error, reason} on failure.
   """
   @spec add_japanese_page(t, String.t()) :: {:ok, Page.t()} | {:error, term}
-  def add_japanese_page(%__MODULE__{name: name} = _story, text) do
-    storage = StorageLayer.new()
-    file_name = StorageLayer.next_page_filename(storage, name)
-
-    case storage |> StorageLayer.write_page(name, file_name, text) do
-      :ok ->
-        number = StorageLayer.extract_page_number(file_name)
-        {:ok, %Page{number: number, story: name}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
+  def add_japanese_page(%__MODULE__{name: name}, text) do
+    StorageLayer.new() |> StorageLayer.create_japanese_page(name, text)
   end
 
   @doc """

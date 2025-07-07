@@ -262,4 +262,20 @@ defmodule Japanese.Corpus.StorageLayer do
 
     Integer.to_string(next_number) <> @japanese_suffix
   end
+
+  @doc """
+  Creates a new Japanese page in the given story with the provided text.
+  Determines the next available page number and filename, writes the file, and returns {:ok, %Page{}} or {:error, reason}.
+  """
+  @spec create_japanese_page(t(), String.t(), String.t()) :: {:ok, Japanese.Corpus.Page.t()} | {:error, term}
+  def create_japanese_page(storage, story, text) do
+    file_name = next_page_filename(storage, story)
+    case write_page(storage, story, file_name, text) do
+      :ok ->
+        number = extract_page_number(file_name)
+        {:ok, %Japanese.Corpus.Page{number: number, story: story}}
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
 end

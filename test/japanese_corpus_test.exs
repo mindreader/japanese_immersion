@@ -64,16 +64,12 @@ defmodule Japanese.CorpusTest do
 
     test "creates a new Japanese page with the next available number", %{storage: storage} do
       story = %Story{name: "mystory"}
-      expect(StorageLayer, :next_page_filename, 1, fn ^storage, "mystory" -> "3j.md" end)
-
-      expect(StorageLayer, :write_page, 1, fn ^storage, "mystory", "3j.md", "new content" ->
-        :ok
+      expected_page = %Page{number: 3, story: "mystory"}
+      expect(StorageLayer, :create_japanese_page, 1, fn ^storage, "mystory", "new content" ->
+        {:ok, expected_page}
       end)
-
-      expect(StorageLayer, :extract_page_number, 1, fn "3j.md" -> 3 end)
-
-      assert {:ok, %Page{number: 3, story: "mystory"}} =
-               Story.add_japanese_page(story, "new content")
+      stub(StorageLayer, :new, fn -> storage end)
+      assert {:ok, ^expected_page} = Story.add_japanese_page(story, "new content")
     end
   end
 
