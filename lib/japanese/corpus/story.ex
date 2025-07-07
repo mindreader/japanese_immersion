@@ -4,6 +4,7 @@ defmodule Japanese.Corpus.Story do
   - :name  — the story's directory name (string)
   """
   alias Japanese.Corpus.Page
+  alias Japanese.Corpus.StorageLayer
 
   @type t :: %__MODULE__{
           name: String.t()
@@ -13,8 +14,25 @@ defmodule Japanese.Corpus.Story do
   @doc """
   Lists all pages in the story directory (returns a list of %Japanese.Corpus.Page{} structs).
   """
-  @spec list_pages(t, String.t()) :: [Page.t()]
-  def list_pages(story, root_dir \\ "txt"), do: pair_files(story, root_dir)
+  @spec list_pages(t) :: [Page.t()]
+  def list_pages(story) do
+    StorageLayer.new()
+    |> StorageLayer.pair_files(story.name)
+    |> case do
+      {:ok, pairs} ->
+        Enum.map(pairs, fn %{number: number, japanese: jap, english: eng} ->
+          %Page{
+            number: number,
+            japanese: jap,
+            english: eng,
+            root_dir: Path.join(StorageLayer.new().working_directory, story.name)
+          }
+        end)
+
+      _ ->
+        []
+    end
+  end
 
   @doc """
   Lists all Japanese files (ending with 'j.md') in the story directory.
@@ -29,10 +47,14 @@ defmodule Japanese.Corpus.Story do
       # => [{"story1", ["1j.md", "2j.md"]}, {"story2", ["1j.md"]}, ...]
 
   """
-  @spec list_japanese_files(t, String.t()) :: [String.t()]
-  def list_japanese_files(%__MODULE__{name: name}, root_dir \\ "txt") do
-    story_dir = Path.join(root_dir, name)
-    Japanese.Corpus.list_files_with_extension(story_dir, "j.md")
+  @spec list_japanese_files(t) :: [String.t()]
+  def list_japanese_files(%__MODULE__{name: name}) do
+    StorageLayer.new()
+    |> StorageLayer.list_japanese_files(name)
+    |> case do
+      {:ok, files} -> files
+      _ -> []
+    end
   end
 
   @doc """
@@ -49,35 +71,18 @@ defmodule Japanese.Corpus.Story do
       #   %Japanese.Corpus.Page{number: "2", japanese: "2j.md", english: nil}
       # ]
   """
-  @spec pair_files(t, String.t()) :: [Page.t()]
-  def pair_files(%__MODULE__{name: name}, root_dir \\ "txt") do
-    story_dir = Path.join(root_dir, name)
-    jap_files = Japanese.Corpus.list_files_with_extension(story_dir, "j.md")
-
-    jap_files
-    |> Enum.map(fn jap_file ->
-      number = String.replace_suffix(jap_file, "j.md", "") |> String.to_integer()
-      eng_file = Integer.to_string(number) <> "e.md"
-      eng_path = Path.join(story_dir, eng_file)
-
-      %Page{
-        number: number,
-        japanese: jap_file,
-        english: if(File.exists?(eng_path), do: eng_file, else: nil),
-        root_dir: story_dir
-      }
-    end)
-  end
+  @spec pair_files(t) :: [Page.t()]
+  def pair_files(story), do: list_pages(story)
 
   @doc """
-  Creates a new story directory under the given root directory (default: "txt/").
+  Creates a new story directory.
   Returns {:ok, %Japanese.Corpus.Story{}} on success, {:error, reason} on failure.
   """
-  @spec create(String.t(), String.t()) :: {:ok, t} | {:error, term}
-  def create(name, root_dir \\ "txt") do
-    story_dir = Path.join(root_dir, name)
-
-    case File.mkdir(story_dir) do
+  @spec create(String.t()) :: {:ok, t} | {:error, term}
+  def create(name) do
+    StorageLayer.new()
+    |> StorageLayer.create_story(name)
+    |> case do
       :ok -> {:ok, %__MODULE__{name: name}}
       {:error, reason} -> {:error, reason}
     end
@@ -85,30 +90,33 @@ defmodule Japanese.Corpus.Story do
 
   @doc """
   Adds a new Japanese page to the end of an existing story.
-  Takes the story struct, the Japanese text, and the root directory (default: "txt/").
+  Takes the story struct and the Japanese text.
   Creates a new file with the next available number (e.g., "3j.md").
   Returns {:ok, file_name} on success, {:error, reason} on failure.
   """
-  @spec add_japanese_page(t, String.t(), String.t()) :: {:ok, String.t()} | {:error, term}
-  def add_japanese_page(%__MODULE__{name: name}, text, root_dir \\ "txt") do
-    story_dir = Path.join(root_dir, name)
-    jap_files = Japanese.Corpus.list_files_with_extension(story_dir, "j.md")
+  @spec add_japanese_page(t, String.t()) :: {:ok, String.t()} | {:error, term}
+  def add_japanese_page(%__MODULE__{name: name}, text) do
+    StorageLayer.new()
+    |> StorageLayer.list_japanese_files(name)
+    |> case do
+      {:ok, jap_files} ->
+        next_number =
+          jap_files
+          |> Enum.map(&StorageLayer.extract_page_number/1)
+          |> Enum.reject(&is_nil/1)
+          |> Enum.max(fn -> 0 end)
+          |> Kernel.+(1)
+          |> Integer.to_string()
 
-    next_number =
-      jap_files
-      |> Enum.map(fn file ->
-        file |> String.replace_suffix("j.md", "") |> Integer.parse() |> elem(0)
-      end)
-      |> Enum.max(fn -> 0 end)
-      |> Kernel.+(1)
-      |> Integer.to_string()
+        StorageLayer.new()
+        |> StorageLayer.write_page(name, next_number <> "j.md", text)
+        |> case do
+          :ok -> {:ok, next_number <> "j.md"}
+          {:error, reason} -> {:error, reason}
+        end
 
-    file_name = next_number <> "j.md"
-    file_path = Path.join(story_dir, file_name)
-
-    case File.write(file_path, text) do
-      :ok -> {:ok, file_name}
-      {:error, reason} -> {:error, reason}
+      _ ->
+        {:error, :cannot_list_japanese_files}
     end
   end
 end

@@ -40,6 +40,9 @@ defmodule Japanese.DataCase do
     # on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
   end
 
+  @spec errors_on(Ecto.Changeset.t()) :: %{
+          optional(atom()) => list() | %{optional(atom()) => any()}
+        }
   @doc """
   A helper that transforms changeset errors into a map of messages.
 

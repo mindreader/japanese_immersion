@@ -13,15 +13,15 @@ defmodule Japanese.Corpus do
   alias Japanese.Corpus.StorageLayer
 
   @doc """
-  Lists all stories (subdirectories) in the given root directory (default: "txt/").
+  Lists all stories (subdirectories) in the corpus.
   Uses the StorageLayer abstraction for access.
   Returns a list of %Japanese.Corpus.Story{} structs with only the name field set.
   """
-  @spec list_stories(String.t()) :: [Story.t()]
-  def list_stories(root_dir \\ "txt") do
-    fs = %StorageLayer{working_directory: root_dir}
-
-    case StorageLayer.list_stories(fs) do
+  @spec list_stories() :: [Story.t()]
+  def list_stories() do
+    StorageLayer.new()
+    |> StorageLayer.list_stories()
+    |> case do
       {:ok, entries} ->
         Enum.map(entries, fn name -> %Japanese.Corpus.Story{name: name} end)
 

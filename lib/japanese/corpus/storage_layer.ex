@@ -12,6 +12,94 @@ defmodule Japanese.Corpus.StorageLayer do
         }
 
   @doc """
+  Creates a new StorageLayer struct using the working directory from config (:japanese, :corpus_dir).
+  """
+  @spec new() :: t()
+  def new() do
+    working_directory =
+      Application.get_env(:japanese, :corpus_dir) ||
+        raise "Missing :corpus_dir in :japanese config"
+
+    %__MODULE__{working_directory: working_directory}
+  end
+
+  # --- FILENAME CONVENTIONS ---
+  @japanese_suffix "j.md"
+  @english_suffix "e.md"
+
+  @doc """
+  Returns true if the filename is a Japanese page file.
+  """
+  def is_japanese_file?(filename) do
+    String.ends_with?(filename, @japanese_suffix) and
+      filename =~ ~r/^\d+j\.md$/
+  end
+
+  @doc """
+  Returns true if the filename is an English page file.
+  """
+  def is_english_file?(filename) do
+    String.ends_with?(filename, @english_suffix) and
+      filename =~ ~r/^\d+e\.md$/
+  end
+
+  @doc """
+  Extracts the page number from a Japanese or English filename.
+  Returns an integer or nil if not a valid page file.
+  """
+  def extract_page_number(filename) do
+    cond do
+      is_japanese_file?(filename) ->
+        filename |> String.replace_suffix(@japanese_suffix, "") |> String.to_integer()
+
+      is_english_file?(filename) ->
+        filename |> String.replace_suffix(@english_suffix, "") |> String.to_integer()
+
+      true ->
+        nil
+    end
+  end
+
+  @doc """
+  Lists all Japanese files in a given story.
+  """
+  @spec list_japanese_files(t(), String.t()) :: {:ok, [String.t()]} | {:error, term()}
+  def list_japanese_files(%__MODULE__{working_directory: wd}, story) do
+    with {:ok, files} <- list_pages(%__MODULE__{working_directory: wd}, story) do
+      {:ok, Enum.filter(files, &is_japanese_file?/1)}
+    end
+  end
+
+  @doc """
+  Pairs Japanese files with their corresponding English files in a story.
+  Returns a list of maps: %{number, japanese, english}
+  """
+  @spec pair_files(t(), String.t()) :: {:ok, [map()]} | {:error, term()}
+  def pair_files(%__MODULE__{working_directory: wd} = storage, story) do
+    story_dir = Path.join(wd, story)
+
+    with {:ok, files} <- list_pages(storage, story) do
+      jap_files = Enum.filter(files, &is_japanese_file?/1)
+
+      pairs =
+        jap_files
+        |> Enum.map(fn jap_file ->
+          number = extract_page_number(jap_file)
+          eng_file = Integer.to_string(number) <> @english_suffix
+          eng_path = Path.join(story_dir, eng_file)
+
+          %{
+            number: number,
+            japanese: jap_file,
+            english: if(File.exists?(eng_path), do: eng_file, else: nil)
+          }
+        end)
+
+      {:ok, pairs}
+    end
+  end
+
+  @doc """
   Lists all stories (subdirectories) in the corpus.
   """
   @spec list_stories(t()) :: {:ok, [String.t()]} | {:error, term()}
