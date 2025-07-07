@@ -200,4 +200,47 @@ defmodule Japanese.Corpus.StorageLayer do
     file_path = Path.join([wd, story, page])
     File.rm(file_path)
   end
+
+  @doc """
+  Writes a translation (or original) for a page, given the story, page number, language, and content.
+  Determines the filename and writes the file.
+  Returns {:ok, :written} or {:error, reason}.
+  """
+  @spec write_translation(t(), String.t(), integer(), :japanese | :english, String.t()) ::
+          {:ok, :written} | {:error, term}
+  def write_translation(storage, story, number, lang, content) do
+    filename = page_filename(storage, story, number, lang)
+
+    case write_page(storage, story, filename, content) do
+      :ok -> {:ok, :written}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Returns the filename for a specific page number and language.
+  """
+  @spec page_filename(t(), String.t(), integer(), :japanese | :english) :: String.t()
+  def page_filename(_storage, _story, number, :japanese),
+    do: Integer.to_string(number) <> @japanese_suffix
+
+  def page_filename(_storage, _story, number, :english),
+    do: Integer.to_string(number) <> @english_suffix
+
+  @doc """
+  Returns the next available filename for a new Japanese page in the given story.
+  """
+  @spec next_page_filename(t(), String.t()) :: String.t()
+  def next_page_filename(storage, story) do
+    {:ok, files} = list_japanese_files(storage, story)
+
+    next_number =
+      files
+      |> Enum.map(&extract_page_number/1)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.max(fn -> 0 end)
+      |> Kernel.+(1)
+
+    Integer.to_string(next_number) <> @japanese_suffix
+  end
 end

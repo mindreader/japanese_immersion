@@ -1,33 +1,26 @@
 defmodule Japanese.Corpus.Page do
   @moduledoc """
-  Struct representing a Japanese-English file page for a story.
+  Struct representing a page in a story.
   - :number   — the page number as an integer
-  - :japanese — the Japanese file name (string)
-  - :english  — the English file name (string or nil if missing)
-  - :root_dir — the root directory of the story (string, defaults to "txt")
+  - :story    — the story name as a string
   """
+  alias Japanese.Corpus.StorageLayer
+
   @type t :: %__MODULE__{
           number: integer(),
-          japanese: String.t(),
-          english: String.t() | nil,
-          root_dir: String.t()
+          story: String.t()
         }
-  defstruct number: nil, japanese: nil, english: nil, root_dir: "txt"
+  defstruct number: nil, story: nil
 
   @doc """
   Adds or updates the English translation for an existing Japanese page.
   Takes the page struct and the translation text.
-  Creates or overwrites the corresponding English file (e.g., "1e.md") in the page's root_dir.
-  Returns {:ok, file_name} on success, {:error, reason} on failure.
+  Delegates to the storage layer to determine the filename and do the write.
+  Returns {:ok, :written} on success, {:error, reason} on failure.
   """
-  @spec translate(t, String.t()) :: {:ok, String.t()} | {:error, term}
-  def translate(%__MODULE__{number: number, root_dir: root_dir}, text) do
-    file_name = Integer.to_string(number) <> "e.md"
-    file_path = Path.join(root_dir, file_name)
-
-    case File.write(file_path, text) do
-      :ok -> {:ok, file_name}
-      {:error, reason} -> {:error, reason}
-    end
+  @spec translate(t, String.t()) :: {:ok, :written} | {:error, term}
+  def translate(%__MODULE__{number: number, story: story}, text) do
+    storage = StorageLayer.new()
+    StorageLayer.write_translation(storage, story, number, :english, text)
   end
 end
