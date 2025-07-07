@@ -1,4 +1,4 @@
-defmodule AnthropicResponseSchemaTest do
+defmodule Test.Japanese.Schemas.Anthropic.Response do
   use ExUnit.Case, async: true
 
   alias Japanese.Schemas.Anthropic.Response

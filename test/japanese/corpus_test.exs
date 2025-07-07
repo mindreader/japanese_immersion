@@ -1,10 +1,11 @@
-defmodule Japanese.CorpusTest do
+defmodule Test.Japanese.Corpus do
   use ExUnit.Case, async: true
   use Mimic
 
   alias Japanese.Corpus.Story
   alias Japanese.Corpus.Page
   alias Japanese.Corpus.StorageLayer
+  alias Japanese.Corpus
 
   setup do
     storage = StorageLayer.new()
@@ -24,16 +25,13 @@ defmodule Japanese.CorpusTest do
 
       expect(StorageLayer, :list_stories, 1, fn ^storage -> fs_result end)
 
-      assert [%{name: "story1"}, %{name: "story2"}] =
-               StorageLayer.list_stories(storage)
-               |> (case do
-                     {:ok, entries} -> Enum.map(entries, fn name -> %Story{name: name} end)
-                     _ -> []
-                   end)
+      assert [%{name: "story1"}, %{name: "story2"}] = Corpus.list_stories()
     end
 
     test "returns an empty list if StorageLayer returns an error", %{storage: storage} do
-      assert StorageLayer.list_stories(storage) == {:ok, []}
+      expect(StorageLayer, :list_stories, 1, fn ^storage -> {:error, :not_found} end)
+
+      assert [] = Corpus.list_stories()
     end
   end
 
