@@ -116,6 +116,10 @@ if config_env() == :prod do
   # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
 end
 
+if config_env() != :test do
+  config :japanese, anthropic_api_key: System.fetch_env!("ANTHROPIC_API_KEY")
+end
+
 if config_env() == :prod do
   config :japanese, corpus_dir: System.fetch_env!("CORPUS_DIR")
 end
