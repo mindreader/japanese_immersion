@@ -30,36 +30,6 @@ defmodule Japanese.Corpus.Story do
   end
 
   @doc """
-  Lists all Japanese files (ending with 'j.md') in the story directory.
-  Returns a list of file names as strings.
-
-  ## Example
-
-      iex> stories = Japanese.Corpus.list_stories()
-      iex> stories |> Enum.map(fn story ->
-      ...>   {story.name, Japanese.Corpus.Story.list_japanese_files(story)}
-      ...> end)
-      # => [{"story1", ["1j.md", "2j.md"]}, {"story2", ["1j.md"]}, ...]
-
-  """
-  @spec list_japanese_files(t) :: [String.t()]
-  def list_japanese_files(%__MODULE__{name: name}) do
-    StorageLayer.new()
-    |> StorageLayer.list_japanese_files(name)
-    |> case do
-      {:ok, files} -> files
-      _ -> []
-    end
-  end
-
-  @doc """
-  Pairs Japanese files (ending with 'j.md') with their corresponding English files (ending with 'e.md') in the story directory.
-  Returns a list of %Japanese.Corpus.Page{} structs: %{number, story}
-  """
-  @spec pair_files(t) :: [Page.t()]
-  def pair_files(story), do: list_pages(story)
-
-  @doc """
   Creates a new story directory.
   Returns {:ok, %Japanese.Corpus.Story{}} on success, {:error, reason} on failure.
   """
