@@ -90,4 +90,19 @@ defmodule Japanese.CorpusTest do
       assert {:error, :eacces} = Story.create("failstory")
     end
   end
+
+  describe "Page.translate/2" do
+    setup :verify_on_exit!
+
+    test "writes an English translation for a page", %{storage: storage} do
+      page = %Page{number: 5, story: "mystory"}
+      english = "This is the English translation."
+
+      expect(StorageLayer, :write_translation, 1, fn ^storage, "mystory", 5, ^english ->
+        {:ok, :written}
+      end)
+
+      assert {:ok, :written} = Page.translate(page, english)
+    end
+  end
 end
