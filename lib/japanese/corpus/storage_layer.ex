@@ -205,12 +205,10 @@ defmodule Japanese.Corpus.StorageLayer do
 
     case {jap_result, eng_result} do
       {:ok, :ok} -> :ok
-      {{:error, reason}, _} -> {:error, reason}
-      {_, {:error, reason}} -> {:error, reason}
-      # If both files do not exist, treat as success
-      {{:error, :enoent}, {:error, :enoent}} -> :ok
-      {{:error, :enoent}, :ok} -> :ok
       {:ok, {:error, :enoent}} -> :ok
+      {{:error, :enoent}, _} -> {:error, :enoent}
+      {{:error, reason}, _} -> {:error, reason}
+      {_, {:error, reason}} when reason != :enoent -> {:error, reason}
     end
   end
 

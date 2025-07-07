@@ -62,7 +62,8 @@ defmodule Japanese.MixProject do
       {:exsync, "~> 0.4.1", only: :dev},
       {:tidewave, "~> 0.1", only: :dev},
       {:mimic, "~> 1.12", only: :test},
-      {:ex_machina, "~> 2.8.0", only: :test}
+      {:ex_machina, "~> 2.8.0", only: :test},
+      {:dialyxir, "~> 1.4", only: :dev}
     ]
   end
 
