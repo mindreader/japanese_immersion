@@ -20,7 +20,7 @@ defmodule Japanese.Corpus.Page do
   """
   @spec translate(t, String.t()) :: {:ok, :written} | {:error, term}
   def translate(%__MODULE__{number: number, story: story}, text) do
-    storage = StorageLayer.new()
-    StorageLayer.write_translation(storage, story, number, :english, text)
+    StorageLayer.new()
+    |> StorageLayer.write_translation(story, number, :english, text)
   end
 end

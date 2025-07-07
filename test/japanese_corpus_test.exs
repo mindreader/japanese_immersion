@@ -42,17 +42,20 @@ defmodule Japanese.CorpusTest do
 
     test "returns a list of Page structs for a story", %{storage: storage} do
       story = %Story{name: "mystory"}
+
       fake_pairs = [
         %{number: 1},
         %{number: 2}
       ]
+
       expect(StorageLayer, :pair_files, 1, fn ^storage, "mystory" -> {:ok, fake_pairs} end)
 
       pages = Story.list_pages(story)
+
       assert [
-        %Page{number: 1, story: "mystory"},
-        %Page{number: 2, story: "mystory"}
-      ] = pages
+               %Page{number: 1, story: "mystory"},
+               %Page{number: 2, story: "mystory"}
+             ] = pages
     end
   end
 
@@ -62,9 +65,15 @@ defmodule Japanese.CorpusTest do
     test "creates a new Japanese page with the next available number", %{storage: storage} do
       story = %Story{name: "mystory"}
       expect(StorageLayer, :next_page_filename, 1, fn ^storage, "mystory" -> "3j.md" end)
-      expect(StorageLayer, :write_page, 1, fn ^storage, "mystory", "3j.md", "new content" -> :ok end)
+
+      expect(StorageLayer, :write_page, 1, fn ^storage, "mystory", "3j.md", "new content" ->
+        :ok
+      end)
+
       expect(StorageLayer, :extract_page_number, 1, fn "3j.md" -> 3 end)
-      assert {:ok, %Page{number: 3, story: "mystory"}} = Story.add_japanese_page(story, "new content")
+
+      assert {:ok, %Page{number: 3, story: "mystory"}} =
+               Story.add_japanese_page(story, "new content")
     end
   end
 
