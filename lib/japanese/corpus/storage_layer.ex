@@ -202,14 +202,14 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Writes a translation (or original) for a page, given the story, page number, language, and content.
-  Determines the filename and writes the file.
+  Writes a translation (or original) for a page, given the story, page number, and content.
+  Determines the filename (always Japanese) and writes the file.
   Returns {:ok, :written} or {:error, reason}.
   """
-  @spec write_translation(t(), String.t(), integer(), :japanese | :english, String.t()) ::
+  @spec write_translation(t(), String.t(), integer(), String.t()) ::
           {:ok, :written} | {:error, term}
-  def write_translation(storage, story, number, lang, content) do
-    filename = page_filename(storage, story, number, lang)
+  def write_translation(storage, story, number, content) do
+    filename = page_filename(storage, story, number, :japanese)
 
     case write_page(storage, story, filename, content) do
       :ok -> {:ok, :written}
