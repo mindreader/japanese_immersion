@@ -66,7 +66,7 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
     {:noreply, socket |> put_flash(:error, "Editing stories is not supported.")}
   end
 
-  defp save_story(socket, :new, %{"name" => name} = story_params) do
+  defp save_story(socket, :new, %{"name" => name}) do
     name = String.trim(name)
     if name == "" do
       form = Phoenix.Component.to_form(%{"name" => name}, errors: %{name: "can't be blank"})
