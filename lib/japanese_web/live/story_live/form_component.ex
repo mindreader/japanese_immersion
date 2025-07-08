@@ -24,21 +24,6 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
           <.button phx-disable-with="Saving...">Save Story</.button>
         </:actions>
       </.simple_form>
-
-      <div class="mt-8">
-        <h3 class="text-lg font-semibold leading-8 text-zinc-800">Pages</h3>
-        <div class="mt-4">
-          <div :if={@pages == []} class="text-sm text-zinc-600">
-            No pages found in this story.
-          </div>
-          <div :if={@pages != []} class="space-y-2">
-            <div :for={page <- @pages} class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span class="text-sm font-medium text-zinc-800">Page #{page.number}</span>
-              <span class="text-xs text-zinc-500">Story: {page.story}</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
     """
   end

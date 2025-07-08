@@ -5,7 +5,7 @@ defmodule JapaneseWeb.StoryLive.Show do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket}
+    {:ok, assign(socket, new_page_text: nil, new_page_error: nil)}
   end
 
   @impl true
@@ -17,7 +17,9 @@ defmodule JapaneseWeb.StoryLive.Show do
          socket
          |> assign(:page_title, page_title(socket.assigns.live_action))
          |> assign(:story, story)
-         |> assign(:pages, pages)}
+         |> assign(:pages, pages)
+         |> assign(:new_page_text, nil)
+         |> assign(:new_page_error, nil)}
       {:error, :not_found} ->
         {:noreply,
          socket
@@ -50,6 +52,36 @@ defmodule JapaneseWeb.StoryLive.Show do
          socket
          |> put_flash(:error, "Invalid page number.")
          |> push_patch(to: ~p"/stories/#{name}")}
+    end
+  end
+
+  @impl true
+  def handle_event("add_page", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:live_action, :new_page)
+     |> assign(:new_page_text, nil)
+     |> assign(:new_page_error, nil)}
+  end
+
+  @impl true
+  def handle_event("create_page", %{"japanese_text" => text}, socket) do
+    text = String.trim(text || "")
+    if text == "" do
+      {:noreply, assign(socket, new_page_error: "Text can't be blank")}
+    else
+      case Story.add_japanese_page(socket.assigns.story, text) do
+        {:ok, _page} ->
+          pages = Story.list_pages(socket.assigns.story)
+          {:noreply,
+           socket
+           |> assign(:pages, pages)
+           |> assign(:live_action, nil)
+           |> assign(:new_page_text, nil)
+           |> assign(:new_page_error, nil)}
+        {:error, reason} ->
+          {:noreply, assign(socket, new_page_error: inspect(reason))}
+      end
     end
   end
 
