@@ -9,7 +9,7 @@ defmodule JapaneseWeb.StoryLive.Show do
   end
 
   @impl true
-  def handle_params(%{"id" => name}, _, socket) do
+  def handle_params(%{"name" => name}, _, socket) do
     case Story.get_by_name(name) do
       {:ok, story} ->
         {:noreply,

@@ -17,7 +17,7 @@ defmodule JapaneseWeb.StoryLive.Index do
     {:noreply, apply_action(socket, socket.assigns.live_action, params)}
   end
 
-  defp apply_action(socket, :edit, %{"id" => name}) do
+  defp apply_action(socket, :edit, %{"name" => name}) do
     socket
     |> assign(:page_title, "Edit Story")
     |> assign(:story, %Story{name: name})
