@@ -313,4 +313,15 @@ defmodule Japanese.Corpus.StorageLayer do
         end
     end
   end
+
+  @doc """
+  Get the Japanese text for a given story and page number.
+  Returns {:ok, text} or {:error, reason}.
+  """
+  @spec get_japanese_text(t(), String.t(), integer()) :: {:ok, String.t()} | {:error, term}
+  def get_japanese_text(storage, story, number) do
+    filename = page_filename(storage, story, number, :japanese)
+    file_path = Path.join([storage.working_directory, story, filename])
+    File.read(file_path)
+  end
 end

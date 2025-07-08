@@ -43,6 +43,15 @@ defmodule Japanese.Corpus.Page do
     StorageLayer.new() |> StorageLayer.delete_page(story, number)
   end
 
+  @doc """
+  Gets the Japanese text for this page from the storage layer.
+  Returns {:ok, text} or {:error, reason}.
+  """
+  @spec get_japanese_text(t) :: {:ok, String.t()} | {:error, term}
+  def get_japanese_text(%__MODULE__{number: number, story: story}) do
+    StorageLayer.new() |> StorageLayer.get_japanese_text(story, number)
+  end
+
   defimpl Phoenix.Param, for: Japanese.Corpus.Page do
     def to_param(%Japanese.Corpus.Page{number: number}), do: to_string(number)
   end

@@ -68,7 +68,6 @@ defmodule Test.Japanese.Corpus do
         {:ok, expected_page}
       end)
 
-      stub(StorageLayer, :new, fn -> storage end)
       assert {:ok, ^expected_page} = Story.add_japanese_page(story, "new content")
     end
   end
@@ -130,7 +129,6 @@ defmodule Test.Japanese.Corpus do
       page = %Page{number: 7, story: "mystory"}
 
       expect(StorageLayer, :delete_page, 1, fn ^storage, "mystory", 7 -> :ok end)
-      stub(StorageLayer, :new, fn -> storage end)
 
       assert :ok = Page.delete(page)
     end
@@ -139,7 +137,6 @@ defmodule Test.Japanese.Corpus do
       page = %Page{number: 8, story: "mystory"}
 
       expect(StorageLayer, :delete_page, 1, fn ^storage, "mystory", 8 -> {:error, :enoent} end)
-      stub(StorageLayer, :new, fn -> storage end)
 
       assert {:error, :enoent} = Page.delete(page)
     end
@@ -151,15 +148,28 @@ defmodule Test.Japanese.Corpus do
     test "deletes a story and all its files", %{storage: storage} do
       story = %Story{name: "mystory"}
       expect(StorageLayer, :delete_story, 1, fn ^storage, "mystory" -> :ok end)
-      stub(StorageLayer, :new, fn -> storage end)
       assert :ok = Story.delete(story)
     end
 
     test "returns error if deletion fails", %{storage: storage} do
       story = %Story{name: "mystory"}
       expect(StorageLayer, :delete_story, 1, fn ^storage, "mystory" -> {:error, :some_reason} end)
-      stub(StorageLayer, :new, fn -> storage end)
       assert {:error, :some_reason} = Story.delete(story)
+    end
+  end
+
+  describe "Page.get_japanese_text/1" do
+    setup :verify_on_exit!
+
+    test "delegates to StorageLayer and returns the Japanese text", %{storage: storage} do
+      page = %Page{number: 2, story: "mystory"}
+      expected_text = "これは日本語のテキストです。"
+
+      expect(StorageLayer, :get_japanese_text, 1, fn ^storage, "mystory", 2 ->
+        {:ok, expected_text}
+      end)
+
+      assert {:ok, ^expected_text} = Page.get_japanese_text(page)
     end
   end
 end
