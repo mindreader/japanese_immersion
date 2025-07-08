@@ -17,13 +17,15 @@ defmodule JapaneseWeb.Router do
   scope "/", JapaneseWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    get "/", RootController, :home
+
     live "/stories", StoryLive.Index, :index
     live "/stories/new", StoryLive.Index, :new
 
     live "/stories/:name", StoryLive.Show, :show
     live "/stories/:name/edit", StoryLive.Show, :edit
     live "/stories/:name/:page", PageLive.Show, :show
+    get "/stories/:name/:page/japanese", PageController, :japanese
   end
 
   # Other scopes may use custom stacks.

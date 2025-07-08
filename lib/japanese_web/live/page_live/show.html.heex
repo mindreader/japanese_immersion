@@ -5,7 +5,10 @@
 
 <div class="mt-4">
   <p>Page number: {@page.number}</p>
-  <!-- TODO: Render page content here -->
+  <%= if @view_mode == :show do %>
+    <!-- TODO: Render translation here -->
+    <em>Translation view coming soon.</em>
+  <% end %>
 </div>
 
 <.back navigate={~p"/stories/#{@story}"}>Back to story</.back>
