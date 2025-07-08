@@ -283,4 +283,23 @@ defmodule Japanese.Corpus.StorageLayer do
         {:error, reason}
     end
   end
+
+  @doc """
+  Renames a story (subdirectory) from old_name to new_name.
+  Returns :ok if successful, {:error, reason} otherwise.
+  """
+  @spec rename_story(t(), String.t(), String.t()) :: :ok | {:error, term()}
+  def rename_story(%__MODULE__{working_directory: wd}, old_name, new_name) do
+    old_dir = Path.join(wd, old_name)
+    new_dir = Path.join(wd, new_name)
+    cond do
+      !File.dir?(old_dir) -> {:error, :not_found}
+      File.dir?(new_dir) -> {:error, :already_exists}
+      true ->
+        case File.rename(old_dir, new_dir) do
+          :ok -> :ok
+          {:error, reason} -> {:error, reason}
+        end
+    end
+  end
 end

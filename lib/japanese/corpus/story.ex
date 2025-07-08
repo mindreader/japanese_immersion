@@ -77,6 +77,20 @@ defmodule Japanese.Corpus.Story do
       {:error, :not_found}
     end
   end
+
+  @doc """
+  Renames a story from old_name to new_name, ensuring the new name does not already exist.
+  Returns {:ok, %Story{name: new_name}} or {:error, reason}.
+  """
+  @spec rename(String.t(), String.t()) :: {:ok, t} | {:error, term}
+  def rename(old_name, new_name) do
+    StorageLayer.new()
+    |> StorageLayer.rename_story(old_name, new_name)
+    |> case do
+      :ok -> {:ok, %__MODULE__{name: new_name}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
 end
 
 defimpl Phoenix.Param, for: Japanese.Corpus.Story do
