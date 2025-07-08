@@ -3,27 +3,47 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
   use Mimic
   import Phoenix.LiveViewTest
 
-  alias Japanese.Corpus.StorageLayer
+  alias Japanese.Corpus.Story
 
   setup :verify_on_exit!
 
   setup do
-    storage = StorageLayer.new()
-    Mimic.stub(StorageLayer, :new, fn -> storage end)
-    %{storage: storage}
+    Mimic.copy(Japanese.Corpus.Story)
+    :ok
   end
 
-  test "renders story if it exists", %{conn: conn, storage: storage} do
+  test "renders story if it exists", %{conn: conn} do
     story_name = "test_story"
-    Mimic.expect(StorageLayer, :story_exists?, 2, fn ^storage, ^story_name -> true end)
-    {:ok, _view, html} = live(conn, "/stories/#{story_name}")
+    story = %Story{name: story_name}
+    Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
+    {:ok, _view, html} = live(conn, ~p"/stories/#{story}")
     assert html =~ "Show Story"
-    assert html =~ story_name
+    assert html =~ story.name
   end
 
-  test "redirects with error if story does not exist", %{conn: conn, storage: storage} do
+  test "redirects with error if story does not exist", %{conn: conn} do
     story_name = "nonexistent_story"
-    Mimic.expect(StorageLayer, :story_exists?, fn ^storage, ^story_name -> false end)
-    assert {:error, {:live_redirect, %{to: "/stories"}}} = live(conn, "/stories/#{story_name}")
+    Mimic.expect(Story, :get_by_name, 1, fn ^story_name -> {:error, :not_found} end)
+    assert {:error, {:live_redirect, %{to: "/stories"}}} = live(conn, ~p"/stories/#{story_name}")
+  end
+
+  test "can edit a story's name", %{conn: conn} do
+    old_name = "test_story"
+    new_name = "renamed_story"
+    old_story = %Story{name: old_name}
+    new_story = %Story{name: new_name}
+    # get_by_name is called for old_name (show, edit, after patch) and new_name (after rename)
+    Mimic.expect(Story, :get_by_name, 3, fn ^old_name -> {:ok, old_story} end)
+    Mimic.expect(Story, :get_by_name, 1, fn ^new_name -> {:ok, new_story} end)
+    Mimic.expect(Story, :rename, fn ^old_name, ^new_name -> {:ok, new_story} end)
+
+    {:ok, view, _html} = live(conn, ~p"/stories/#{old_name}")
+    element(view, "a", "Edit story") |> render_click()
+    assert render(view) =~ "Edit Story"
+
+    form_el = element(view, "#story-form")
+    render_submit(form_el, %{story: %{name: new_name}})
+    assert render(view) =~ "Story renamed successfully"
+    assert_patch(view, ~p"/stories/#{new_name}")
   end
 end
