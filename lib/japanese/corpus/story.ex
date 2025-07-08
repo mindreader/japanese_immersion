@@ -63,4 +63,22 @@ defmodule Japanese.Corpus.Story do
     StorageLayer.new()
     |> StorageLayer.delete_story(name)
   end
+
+  @doc """
+  Gets a story by name, ensuring it exists in storage.
+  Returns {:ok, %Japanese.Corpus.Story{}} if found, {:error, :not_found} otherwise.
+  """
+  @spec get_by_name(String.t()) :: {:ok, t} | {:error, :not_found}
+  def get_by_name(name) do
+    storage = StorageLayer.new()
+    if StorageLayer.story_exists?(storage, name) do
+      {:ok, %__MODULE__{name: name}}
+    else
+      {:error, :not_found}
+    end
+  end
+end
+
+defimpl Phoenix.Param, for: Japanese.Corpus.Story do
+  def to_param(%Japanese.Corpus.Story{name: name}), do: name
 end
