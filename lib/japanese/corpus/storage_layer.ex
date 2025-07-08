@@ -28,23 +28,23 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   # --- FILENAME CONVENTIONS ---
-  @japanese_suffix "j.md"
-  @english_suffix "e.md"
+  @japanese_suffix "j.txt"
+  @translation_suffix "tr.yaml"
 
   @doc """
-  Returns true if the filename is a Japanese page file (e.g., "1j.md").
+  Returns true if the filename is a Japanese page file (e.g., "1j.txt").
   """
   def is_japanese_file?(filename) do
     String.ends_with?(filename, @japanese_suffix) and
-      filename =~ ~r/^\d+j\.md$/
+      filename =~ ~r/^\d+j\.txt$/
   end
 
   @doc """
-  Returns true if the filename is an English page file (e.g., "1e.md").
+  Returns true if the filename is a translation file (e.g., "1tr.yaml").
   """
-  def is_english_file?(filename) do
-    String.ends_with?(filename, @english_suffix) and
-      filename =~ ~r/^\d+e\.md$/
+  def is_translation_file?(filename) do
+    String.ends_with?(filename, @translation_suffix) and
+      filename =~ ~r/^\d+tr\.yaml$/
   end
 
   @doc """
@@ -55,10 +55,8 @@ defmodule Japanese.Corpus.StorageLayer do
     cond do
       is_japanese_file?(filename) ->
         filename |> String.replace_suffix(@japanese_suffix, "") |> String.to_integer()
-
-      is_english_file?(filename) ->
-        filename |> String.replace_suffix(@english_suffix, "") |> String.to_integer()
-
+      is_translation_file?(filename) ->
+        filename |> String.replace_suffix(@translation_suffix, "") |> String.to_integer()
       true ->
         nil
     end
@@ -76,9 +74,9 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Pair Japanese files with their corresponding English files in a story.
+  Pair Japanese files with their corresponding translation files in a story.
 
-  Returns a list of maps: %{number, japanese, english}, where :english may be nil if missing.
+  Returns a list of maps: %{number, japanese, translation}, where :translation may be nil if missing.
   """
   @spec pair_files(t(), String.t()) :: {:ok, [map()]} | {:error, term()}
   def pair_files(%__MODULE__{working_directory: wd} = storage, story) do
@@ -91,13 +89,13 @@ defmodule Japanese.Corpus.StorageLayer do
         jap_files
         |> Enum.map(fn jap_file ->
           number = extract_page_number(jap_file)
-          eng_file = Integer.to_string(number) <> @english_suffix
-          eng_path = Path.join(story_dir, eng_file)
+          tr_file = Integer.to_string(number) <> @translation_suffix
+          tr_path = Path.join(story_dir, tr_file)
 
           %{
             number: number,
             japanese: jap_file,
-            english: if(File.exists?(eng_path), do: eng_file, else: nil)
+            translation: if(File.exists?(tr_path), do: tr_file, else: nil)
           }
         end)
 
@@ -212,7 +210,7 @@ defmodule Japanese.Corpus.StorageLayer do
   @spec delete_page(t(), String.t(), integer()) :: :ok | {:error, term}
   def delete_page(%__MODULE__{} = storage, story, number) do
     jap_file = page_filename(storage, story, number, :japanese)
-    eng_file = page_filename(storage, story, number, :english)
+    eng_file = page_filename(storage, story, number, :translation)
     jap_result = delete_file(storage, story, jap_file)
     eng_result = delete_file(storage, story, eng_file)
 
@@ -242,7 +240,7 @@ defmodule Japanese.Corpus.StorageLayer do
   @spec write_english_translation(t(), String.t(), integer(), String.t()) ::
           {:ok, :written} | {:error, term}
   def write_english_translation(storage, story, number, english) do
-    filename = page_filename(storage, story, number, :english)
+    filename = page_filename(storage, story, number, :translation)
 
     case write_page(storage, story, filename, english) do
       :ok -> {:ok, :written}
@@ -251,19 +249,19 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Get the filename for a specific page number and language.
-  Returns a string like "1j.md" or "1e.md".
+  Get the filename for a specific page number and type.
+  Returns a string like "1j.txt" or "1tr.yaml".
   """
-  @spec page_filename(t(), String.t(), integer(), :japanese | :english) :: String.t()
+  @spec page_filename(t(), String.t(), integer(), :japanese | :translation) :: String.t()
   def page_filename(_storage, _story, number, :japanese),
     do: Integer.to_string(number) <> @japanese_suffix
 
-  def page_filename(_storage, _story, number, :english),
-    do: Integer.to_string(number) <> @english_suffix
+  def page_filename(_storage, _story, number, :translation),
+    do: Integer.to_string(number) <> @translation_suffix
 
   @doc """
   Get the next available filename for a new Japanese page in the given story.
-  Returns a string like "3j.md".
+  Returns a string like "3j.txt".
   """
   @spec next_page_filename(t(), String.t()) :: String.t()
   def next_page_filename(storage, story) do

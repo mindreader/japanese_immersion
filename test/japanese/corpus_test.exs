@@ -90,22 +90,22 @@ defmodule Test.Japanese.Corpus do
   describe "Page.write_english_translation/2" do
     setup :verify_on_exit!
 
-    test "writes an English translation for a page", %{storage: storage} do
+    test "writes a translation file for a page (translation file: <number>tr.yaml)", %{storage: storage} do
       page = %Page{number: 5, story: "mystory"}
-      english = "This is the English translation."
+      translation = "This is the translation YAML content."
 
-      expect(StorageLayer, :write_english_translation, 1, fn ^storage, "mystory", 5, ^english ->
+      expect(StorageLayer, :write_english_translation, 1, fn ^storage, "mystory", 5, ^translation ->
         {:ok, :written}
       end)
 
-      assert {:ok, :written} = Page.write_english_translation(page, english)
+      assert {:ok, :written} = Page.write_english_translation(page, translation)
     end
   end
 
   describe "Page.delete/1" do
     setup :verify_on_exit!
 
-    test "deletes both Japanese and English files for a page", %{storage: storage} do
+    test "deletes both Japanese and translation files for a page", %{storage: storage} do
       page = %Page{number: 7, story: "mystory"}
 
       expect(StorageLayer, :delete_page, 1, fn ^storage, "mystory", 7 -> :ok end)
