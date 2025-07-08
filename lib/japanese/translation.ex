@@ -11,7 +11,8 @@ defmodule Japanese.Translation do
 
   @type ja_to_en_opts :: [
           literalness: :literal | :natural,
-          translation_notes: boolean()
+          translation_notes: boolean(),
+          interleaved: boolean()
         ]
 
   @type ja_to_en_result :: %{
@@ -23,7 +24,7 @@ defmodule Japanese.Translation do
 
   alias Japanese.Schemas.Anthropic.Response
 
-  @enforce_keys [:text, :usage]
+  @enforce_keys [:text]
   defstruct [:text, :usage]
 
   @type t :: %__MODULE__{
@@ -42,10 +43,26 @@ defmodule Japanese.Translation do
   """
   @spec ja_to_en(String.t(), ja_to_en_opts()) :: t() | {:error, term()}
   def ja_to_en(text, opts \\ []) when is_binary(text) and is_list(opts) do
+    text = cleanup(text)
+
     opts
     |> build_ja_to_en_prompt()
     |> call_anthropix(text)
     |> handle_response(:ja_to_en)
+  end
+
+  def cleanup(japanese_text) do
+    rows = japanese_text |> String.split("\n") |> Enum.map(&String.trim/1)
+
+    # squash any sequences of 3 or more consecutive newlines into 2
+    rows
+    |> Enum.chunk_by(&(&1 == ""))
+    |> Enum.map(fn
+      ["", "", "" | _] -> ["", ""]
+      xs -> xs
+    end)
+    |> Enum.concat()
+    |> Enum.join("\n")
   end
 
   @doc """
@@ -66,6 +83,7 @@ defmodule Japanese.Translation do
 
   defp build_ja_to_en_prompt(opts) do
     literalness = Keyword.get(opts, :literalness, :literal)
+    interleaved = Keyword.get(opts, :interleaved, false)
     translation_notes = Keyword.get(opts, :translation_notes, false)
 
     base =
@@ -80,6 +98,14 @@ defmodule Japanese.Translation do
           "Translate this Japanese to English."
       end
 
+    # TODO there is no need to have newlines between each original line and its single translation.
+    interleaved_part =
+      if interleaved do
+        " Interleave the translation with the original text, so that we alternate between the original and the translation using the original text's paragraphs as the boundaries, ensuring that there is one newline between each pair. If the text seems to be transitioning from one scene to another, add a single line with the word '!CONTINUED!' between the two paragraphs."
+      else
+        ""
+      end
+
     extras_part =
       if translation_notes do
         " Provide translation notes, such as idioms, cultural context, or ambiguous phrases, if relevant."
@@ -87,7 +113,7 @@ defmodule Japanese.Translation do
         ""
       end
 
-    base <> extras_part
+    base <> interleaved_part <> extras_part
   end
 
   defp build_en_to_ja_prompt(_opts) do

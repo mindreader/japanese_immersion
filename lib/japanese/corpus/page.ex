@@ -4,6 +4,8 @@ defmodule Japanese.Corpus.Page do
   - :number   — the page number as an integer
   - :story    — the story name as a string
   """
+
+  require Logger
   alias Japanese.Corpus.StorageLayer
 
   @type t :: %__MODULE__{
@@ -13,15 +15,23 @@ defmodule Japanese.Corpus.Page do
   defstruct number: nil, story: nil
 
   @doc """
-  Adds or updates the English translation for an existing Japanese page.
-  Takes the page struct and the English translation text.
-  Delegates to the storage layer to determine the filename and do the write.
-  Returns {:ok, :written} on success, {:error, reason} on failure.
+  Translates the given Japanese text to English using the Japanese.Translation module.
+  Returns the translation result (not written to file).
   """
-  @spec write_english_translation(t, String.t()) :: {:ok, :written} | {:error, term}
-  def write_english_translation(%__MODULE__{number: number, story: story}, english) do
-    StorageLayer.new()
-    |> StorageLayer.write_english_translation(story, number, english)
+  @spec translate_page(t, String.t()) :: :ok | {:error, term}
+  def translate_page(page, japanese_text) do
+    case Japanese.Translation.ja_to_en(japanese_text, interleaved: true) do
+      %Japanese.Translation{text: interleaved_translation} ->
+        json = Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
+
+        StorageLayer.new()
+        |> StorageLayer.write_english_translation(page.story, page.number, json)
+
+        :ok
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   @doc """

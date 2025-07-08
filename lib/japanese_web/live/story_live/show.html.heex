@@ -19,7 +19,11 @@
     <.link navigate={~p"/stories/#{@story}/#{page}"} class="text-blue-600 hover:underline">
       Page #{page.number}
     </.link>
-    <button phx-click="delete_page" phx-value-number={page.number} class="ml-2 text-red-600 hover:underline">
+    <button
+      phx-click="delete_page"
+      phx-value-number={page.number}
+      class="ml-2 text-red-600 hover:underline"
+    >
       Delete
     </button>
     <!-- TODO: show created_at, modified_at, size, etc. -->
@@ -28,7 +32,12 @@
 
 <.back navigate={~p"/stories"}>Back to stories</.back>
 
-<.modal :if={@live_action == :edit} id="story-modal" show on_cancel={JS.patch(~p"/stories/#{@story}")}>
+<.modal
+  :if={@live_action == :edit}
+  id="story-modal"
+  show
+  on_cancel={JS.patch(~p"/stories/#{@story}")}
+>
   <.live_component
     module={JapaneseWeb.StoryLive.FormComponent}
     id={@story.name}
@@ -39,9 +48,20 @@
   />
 </.modal>
 
-<.modal :if={@live_action == :new_page} id="new-page-modal" show on_cancel={JS.patch(~p"/stories/#{@story}")}>
+<.modal
+  :if={@live_action == :new_page}
+  id="new-page-modal"
+  show
+  on_cancel={JS.patch(~p"/stories/#{@story}")}
+>
   <.simple_form for={%{}} as={:page} phx-submit="create_page">
-    <.input name="japanese_text" type="textarea" label="Japanese Text" value={@new_page_text || ""} rows="12" />
+    <.input
+      name="japanese_text"
+      type="textarea"
+      label="Japanese Text"
+      value={@new_page_text || ""}
+      rows="12"
+    />
     <:actions>
       <.button type="submit">Create Page</.button>
       <.button type="button" phx-click={JS.patch(~p"/stories/#{@story}")}>Cancel</.button>

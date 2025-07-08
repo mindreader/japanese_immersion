@@ -37,7 +37,11 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
 
   @impl true
   def handle_event("validate", %{"story" => story_params}, socket) do
-    errors = if String.trim(story_params["name"] || "") == "", do: [name: {"can't be blank", []}], else: []
+    errors =
+      if String.trim(story_params["name"] || "") == "",
+        do: [name: {"can't be blank", []}],
+        else: []
+
     form = Phoenix.Component.to_form(story_params, errors: errors)
     {:noreply, assign(socket, form: form)}
   end
@@ -61,25 +65,36 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
   defp save_story(socket, :edit, %{"name" => new_name}) do
     old_name = socket.assigns.story.name
     new_name = String.trim(new_name)
+
     cond do
       new_name == "" ->
-        form = Phoenix.Component.to_form(%{"name" => new_name}, errors: [name: {"can't be blank", []}])
+        form =
+          Phoenix.Component.to_form(%{"name" => new_name}, errors: [name: {"can't be blank", []}])
+
         {:noreply, assign(socket, form: form)}
+
       new_name == old_name ->
         {:noreply,
          socket
          |> put_flash(:info, "Story updated successfully (no changes)")
          |> push_patch(to: socket.assigns.patch)}
+
       true ->
         case Story.rename(old_name, new_name) do
           {:ok, story} ->
             notify_parent({:saved, story})
+
             {:noreply,
              socket
              |> put_flash(:info, "Story renamed successfully")
              |> push_patch(to: ~p"/stories/#{story}")}
+
           {:error, reason} ->
-            form = Phoenix.Component.to_form(%{"name" => new_name}, errors: [name: {inspect(reason), []}])
+            form =
+              Phoenix.Component.to_form(%{"name" => new_name},
+                errors: [name: {inspect(reason), []}]
+              )
+
             {:noreply, assign(socket, form: form)}
         end
     end
@@ -87,6 +102,7 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
 
   defp save_story(socket, :new, %{"name" => name}) do
     name = String.trim(name)
+
     if name == "" do
       form = Phoenix.Component.to_form(%{"name" => name}, errors: [name: {"can't be blank", []}])
       {:noreply, assign(socket, form: form)}
@@ -94,12 +110,16 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
       case Story.create(name) do
         {:ok, story} ->
           notify_parent({:saved, story})
+
           {:noreply,
            socket
            |> put_flash(:info, "Story created successfully")
            |> push_patch(to: socket.assigns.patch)}
+
         {:error, reason} ->
-          form = Phoenix.Component.to_form(%{"name" => name}, errors: [name: {inspect(reason), []}])
+          form =
+            Phoenix.Component.to_form(%{"name" => name}, errors: [name: {inspect(reason), []}])
+
           {:noreply, assign(socket, form: form)}
       end
     end

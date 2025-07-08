@@ -90,15 +90,36 @@ defmodule Test.Japanese.Corpus do
   describe "Page.write_english_translation/2" do
     setup :verify_on_exit!
 
-    test "writes a translation file for a page (translation file: <number>tr.yaml)", %{storage: storage} do
+    test "writes a translation file for a page (translation file: <number>tr.yaml)", %{
+      storage: storage
+    } do
       page = %Page{number: 5, story: "mystory"}
-      translation = "This is the translation YAML content."
 
-      expect(StorageLayer, :write_english_translation, 1, fn ^storage, "mystory", 5, ^translation ->
+      japanese_text = "そして私は預言者と共に王都に向かうことになったのだ。"
+
+      interleaved_translation = """
+      そして私は預言者と共に王都に向かうことになったのだ。
+
+      And so I came to head to the royal capital together with the prophet.
+
+      !CONTINUED!
+      """
+
+      expected_json =
+        Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
+
+      stub(Japanese.Translation, :ja_to_en, fn ^japanese_text, interleaved: true ->
+        %Japanese.Translation{text: interleaved_translation}
+      end)
+
+      expect(StorageLayer, :write_english_translation, 1, fn ^storage,
+                                                             "mystory",
+                                                             5,
+                                                             ^expected_json ->
         {:ok, :written}
       end)
 
-      assert {:ok, :written} = Page.write_english_translation(page, translation)
+      assert :ok = Page.translate_page(page, japanese_text)
     end
   end
 

@@ -55,8 +55,10 @@ defmodule Japanese.Corpus.StorageLayer do
     cond do
       is_japanese_file?(filename) ->
         filename |> String.replace_suffix(@japanese_suffix, "") |> String.to_integer()
+
       is_translation_file?(filename) ->
         filename |> String.replace_suffix(@translation_suffix, "") |> String.to_integer()
+
       true ->
         nil
     end
@@ -148,22 +150,14 @@ defmodule Japanese.Corpus.StorageLayer do
     end
   end
 
-  @doc """
-  Read the contents of a page file in a given story directory.
-  Returns {:ok, contents} or {:error, reason}.
-  """
-  @spec read_page(t(), String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def read_page(%__MODULE__{working_directory: wd}, story, page) do
-    file_path = Path.join([wd, story, page])
-    File.read(file_path)
-  end
+  #  @spec read_page(t(), String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
+  #  defp read_page(%__MODULE__{working_directory: wd}, story, page) do
+  #    file_path = Path.join([wd, story, page])
+  #    File.read(file_path)
+  #  end
 
-  @doc """
-  Write contents to a page file in a given story directory. Creates the file if it does not exist.
-  Returns :ok or {:error, reason}.
-  """
   @spec write_page(t(), String.t(), String.t(), String.t()) :: :ok | {:error, term()}
-  def write_page(%__MODULE__{working_directory: wd}, story, page, contents) do
+  defp write_page(%__MODULE__{working_directory: wd}, story, page, contents) do
     file_path = Path.join([wd, story, page])
     File.write(file_path, contents)
   end
@@ -304,9 +298,14 @@ defmodule Japanese.Corpus.StorageLayer do
   def rename_story(%__MODULE__{working_directory: wd}, old_name, new_name) do
     old_dir = Path.join(wd, old_name)
     new_dir = Path.join(wd, new_name)
+
     cond do
-      !File.dir?(old_dir) -> {:error, :not_found}
-      File.dir?(new_dir) -> {:error, :already_exists}
+      !File.dir?(old_dir) ->
+        {:error, :not_found}
+
+      File.dir?(new_dir) ->
+        {:error, :already_exists}
+
       true ->
         case File.rename(old_dir, new_dir) do
           :ok -> :ok

@@ -8,7 +8,10 @@ defmodule JapaneseWeb.StoryLive.Index do
   def mount(_params, _session, socket) do
     socket =
       socket
-      |> Phoenix.LiveView.stream_configure(:stories, dom_id: fn %Japanese.Corpus.Story{name: name} -> "story-#{name}" end)
+      |> Phoenix.LiveView.stream_configure(:stories,
+        dom_id: fn %Japanese.Corpus.Story{name: name} -> "story-#{name}" end
+      )
+
     {:ok, stream(socket, :stories, Corpus.list_stories())}
   end
 

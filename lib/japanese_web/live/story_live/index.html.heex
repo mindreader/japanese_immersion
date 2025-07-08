@@ -29,10 +29,15 @@
   </:action>
 </.table>
 
-<.modal :if={@live_action in [:new, :edit]} id="story-modal" show on_cancel={JS.patch(~p"/stories")}>
+<.modal
+  :if={@live_action in [:new, :edit]}
+  id="story-modal"
+  show
+  on_cancel={JS.patch(~p"/stories")}
+>
   <.live_component
     module={JapaneseWeb.StoryLive.FormComponent}
-    id={@story && @story.name || :new}
+    id={(@story && @story.name) || :new}
     title={@page_title}
     action={@live_action}
     story={@story}

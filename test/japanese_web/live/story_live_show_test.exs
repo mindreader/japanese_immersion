@@ -7,11 +7,6 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
 
   setup :verify_on_exit!
 
-  setup do
-    Mimic.copy(Japanese.Corpus.Story)
-    :ok
-  end
-
   test "renders story if it exists", %{conn: conn} do
     story_name = "test_story"
     story = %Story{name: story_name}

@@ -71,6 +71,7 @@ defmodule Japanese.Corpus.Story do
   @spec get_by_name(String.t()) :: {:ok, t} | {:error, :not_found}
   def get_by_name(name) do
     storage = StorageLayer.new()
+
     if StorageLayer.story_exists?(storage, name) do
       {:ok, %__MODULE__{name: name}}
     else
