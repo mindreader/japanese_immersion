@@ -1,7 +1,10 @@
 defmodule Japanese.Corpus.StorageLayer do
   @moduledoc """
-  Abstraction for corpus data access, scoped to a working directory.
-  All operations are relative to the working directory, but the API is domain-centric.
+  Provides file-based storage and access for the Japanese-English corpus.
+
+  All operations are performed relative to a working directory, with each story as a subdirectory
+  and each page as a file within its story directory. Japanese and English content are stored in
+  separate files (e.g., "1j.md" for Japanese, "1e.md" for English).
   """
 
   @enforce_keys [:working_directory]
@@ -12,7 +15,8 @@ defmodule Japanese.Corpus.StorageLayer do
         }
 
   @doc """
-  Creates a new StorageLayer struct using the working directory from config (:japanese, :corpus_dir).
+  Create a new StorageLayer struct using the working directory from config (:japanese, :corpus_dir).
+  Raises if the config is missing.
   """
   @spec new() :: t()
   def new() do
@@ -28,7 +32,7 @@ defmodule Japanese.Corpus.StorageLayer do
   @english_suffix "e.md"
 
   @doc """
-  Returns true if the filename is a Japanese page file.
+  Returns true if the filename is a Japanese page file (e.g., "1j.md").
   """
   def is_japanese_file?(filename) do
     String.ends_with?(filename, @japanese_suffix) and
@@ -36,7 +40,7 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Returns true if the filename is an English page file.
+  Returns true if the filename is an English page file (e.g., "1e.md").
   """
   def is_english_file?(filename) do
     String.ends_with?(filename, @english_suffix) and
@@ -44,7 +48,7 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Extracts the page number from a Japanese or English filename.
+  Extract the page number from a Japanese or English filename.
   Returns an integer or nil if not a valid page file.
   """
   def extract_page_number(filename) do
@@ -61,7 +65,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Lists all Japanese files in a given story.
+  List all Japanese files in a given story directory.
+  Returns {:ok, [filename]} or {:error, reason}.
   """
   @spec list_japanese_files(t(), String.t()) :: {:ok, [String.t()]} | {:error, term()}
   def list_japanese_files(%__MODULE__{working_directory: wd}, story) do
@@ -71,8 +76,9 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Pairs Japanese files with their corresponding English files in a story.
-  Returns a list of maps: %{number, japanese, english}
+  Pair Japanese files with their corresponding English files in a story.
+
+  Returns a list of maps: %{number, japanese, english}, where :english may be nil if missing.
   """
   @spec pair_files(t(), String.t()) :: {:ok, [map()]} | {:error, term()}
   def pair_files(%__MODULE__{working_directory: wd} = storage, story) do
@@ -100,7 +106,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Lists all stories (subdirectories) in the corpus.
+  List all stories (subdirectories) in the corpus working directory.
+  Returns {:ok, [story_name]} or {:error, reason}.
   """
   @spec list_stories(t()) :: {:ok, [String.t()]} | {:error, term()}
   def list_stories(%__MODULE__{working_directory: wd}) do
@@ -121,7 +128,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Lists all pages (filenames) in a given story.
+  List all page filenames in a given story directory.
+  Returns {:ok, [filename]} or {:error, reason}.
   """
   @spec list_pages(t(), String.t()) :: {:ok, [String.t()]} | {:error, term()}
   def list_pages(%__MODULE__{working_directory: wd}, story) do
@@ -143,7 +151,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Reads the contents of a page (file) in a given story.
+  Read the contents of a page file in a given story directory.
+  Returns {:ok, contents} or {:error, reason}.
   """
   @spec read_page(t(), String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
   def read_page(%__MODULE__{working_directory: wd}, story, page) do
@@ -152,7 +161,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Writes contents to a page (file) in a given story. Creates the page if it does not exist.
+  Write contents to a page file in a given story directory. Creates the file if it does not exist.
+  Returns :ok or {:error, reason}.
   """
   @spec write_page(t(), String.t(), String.t(), String.t()) :: :ok | {:error, term()}
   def write_page(%__MODULE__{working_directory: wd}, story, page, contents) do
@@ -161,7 +171,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Checks if a story exists.
+  Check if a story directory exists.
+  Returns true if the directory exists, false otherwise.
   """
   @spec story_exists?(t(), String.t()) :: boolean()
   def story_exists?(%__MODULE__{working_directory: wd}, story) do
@@ -170,7 +181,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Creates a new story (subdirectory).
+  Create a new story directory.
+  Returns :ok or {:error, reason}.
   """
   @spec create_story(t(), String.t()) :: :ok | {:error, term()}
   def create_story(%__MODULE__{working_directory: wd}, story) do
@@ -179,7 +191,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Deletes a story (subdirectory and all its pages).
+  Delete a story directory and all its page files.
+  Returns :ok if successful, or {:error, reason} if deletion fails.
   """
   @spec delete_story(t(), String.t()) :: :ok | {:error, term()}
   def delete_story(%__MODULE__{working_directory: wd}, story) do
@@ -193,7 +206,7 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Deletes both the Japanese and English page files for the given story and page number.
+  Delete both the Japanese and English page files for the given story and page number.
   Returns :ok if both are deleted or do not exist, or {:error, reason} if any error occurs.
   """
   @spec delete_page(t(), String.t(), integer()) :: :ok | {:error, term}
@@ -223,8 +236,7 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Writes an English translation for a page, given the story, page number, and the English text.
-  Determines the filename (always English) and writes the file.
+  Write an English translation for a page, given the story, page number, and the English text.
   Returns {:ok, :written} or {:error, reason}.
   """
   @spec write_english_translation(t(), String.t(), integer(), String.t()) ::
@@ -239,7 +251,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Returns the filename for a specific page number and language.
+  Get the filename for a specific page number and language.
+  Returns a string like "1j.md" or "1e.md".
   """
   @spec page_filename(t(), String.t(), integer(), :japanese | :english) :: String.t()
   def page_filename(_storage, _story, number, :japanese),
@@ -249,7 +262,8 @@ defmodule Japanese.Corpus.StorageLayer do
     do: Integer.to_string(number) <> @english_suffix
 
   @doc """
-  Returns the next available filename for a new Japanese page in the given story.
+  Get the next available filename for a new Japanese page in the given story.
+  Returns a string like "3j.md".
   """
   @spec next_page_filename(t(), String.t()) :: String.t()
   def next_page_filename(storage, story) do
@@ -266,7 +280,7 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Creates a new Japanese page in the given story with the provided text.
+  Create a new Japanese page in the given story with the provided text.
   Determines the next available page number and filename, writes the file, and returns {:ok, %Page{}} or {:error, reason}.
   """
   @spec create_japanese_page(t(), String.t(), String.t()) ::
@@ -285,8 +299,8 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Renames a story (subdirectory) from old_name to new_name.
-  Returns :ok if successful, {:error, reason} otherwise.
+  Rename a story directory from old_name to new_name.
+  Returns :ok if successful, or {:error, reason} if renaming fails.
   """
   @spec rename_story(t(), String.t(), String.t()) :: :ok | {:error, term()}
   def rename_story(%__MODULE__{working_directory: wd}, old_name, new_name) do

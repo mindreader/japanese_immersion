@@ -1,21 +1,24 @@
 defmodule Japanese.Corpus do
   @moduledoc """
-  Provides primitive functions for accessing and managing a Japanese-English text corpus.
+  High-level entry point for accessing and managing the Japanese-English text corpus.
+
+  This module provides functions to list stories (each a directory on disk) and to work with
+  file-backed pages and translations. All data is stored in the filesystem, not a database.
 
   Features:
-  - List stories (subdirectories) in the corpus
-  - List Japanese files in a story
-  - Pair Japanese files with English files, reporting missing translations
-  - Read and edit file contents
+  - List stories (directories) in the corpus
+  - Each story contains numbered Japanese and English page files (e.g., "1j.md", "1e.md")
+  - See `Japanese.Corpus.Story` and `Japanese.Corpus.Page` for more operations
   """
 
   alias Japanese.Corpus.Story
   alias Japanese.Corpus.StorageLayer
 
   @doc """
-  Lists all stories (subdirectories) in the corpus.
-  Uses the StorageLayer abstraction for access.
-  Returns a list of %Japanese.Corpus.Story{} structs with only the name field set.
+  List all stories (directories) in the corpus root.
+
+  Returns a list of %Japanese.Corpus.Story{} structs (with only the name field set),
+  or an empty list if no stories are found.
   """
   @spec list_stories() :: [Story.t()]
   def list_stories() do
