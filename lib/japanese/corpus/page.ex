@@ -32,4 +32,8 @@ defmodule Japanese.Corpus.Page do
   def delete(%__MODULE__{number: number, story: story}) do
     StorageLayer.new() |> StorageLayer.delete_page(story, number)
   end
+
+  defimpl Phoenix.Param, for: Japanese.Corpus.Page do
+    def to_param(%Japanese.Corpus.Page{number: number}), do: to_string(number)
+  end
 end

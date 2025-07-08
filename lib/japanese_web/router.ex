@@ -23,6 +23,7 @@ defmodule JapaneseWeb.Router do
 
     live "/stories/:name", StoryLive.Show, :show
     live "/stories/:name/edit", StoryLive.Show, :edit
+    live "/stories/:name/:page", PageLive.Show, :show
   end
 
   # Other scopes may use custom stacks.

@@ -1,0 +1,11 @@
+<.header>
+  Page {@page.number} of story {@story.name}
+  <:subtitle>This is a single page view.</:subtitle>
+</.header>
+
+<div class="mt-4">
+  <p>Page number: {@page.number}</p>
+  <!-- TODO: Render page content here -->
+</div>
+
+<.back navigate={~p"/stories/#{@story}"}>Back to story</.back> 
