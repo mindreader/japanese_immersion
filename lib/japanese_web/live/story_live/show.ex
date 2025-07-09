@@ -8,11 +8,26 @@ defmodule JapaneseWeb.StoryLive.Show do
     {:ok, assign(socket, new_page_text: nil, new_page_error: nil)}
   end
 
+  defp manage_story_pubsub_subscription(old_story, new_story) do
+    if new_story != old_story do
+      if old_story do
+        old_story |> Japanese.Events.Story.unsubscribe_story_pages()
+      end
+
+      new_story |> Japanese.Events.Story.subscribe_story_pages()
+    end
+    :ok
+  end
+
   @impl Phoenix.LiveView
   def handle_params(%{"name" => name}, _, socket) do
     case Story.get_by_name(name) do
       {:ok, story} ->
         pages = Story.list_pages(story)
+        old_story = socket.assigns[:story]
+        if Phoenix.LiveView.connected?(socket) do
+          manage_story_pubsub_subscription(old_story, story)
+        end
 
         {:noreply,
          socket
@@ -38,6 +53,8 @@ defmodule JapaneseWeb.StoryLive.Show do
          page_struct when not is_nil(page_struct) <-
            Enum.find(socket.assigns.pages, &(&1.number == page_number)),
          {:ok, japanese_text} <- Japanese.Corpus.Page.get_japanese_text(page_struct) do
+
+
       {:noreply,
        socket
        |> assign(:edit_page_modal, true)
@@ -130,6 +147,17 @@ defmodule JapaneseWeb.StoryLive.Show do
         {:error, reason} ->
           {:noreply, assign(socket, edit_page_error: inspect(reason))}
       end
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:pages_updated, %{story: story_name}}, socket) do
+    # Only reload if this is the current story
+    if socket.assigns[:story] && socket.assigns.story.name == story_name do
+      pages = Story.list_pages(socket.assigns.story)
+      {:noreply, assign(socket, :pages, pages)}
+    else
+      {:noreply, socket}
     end
   end
 

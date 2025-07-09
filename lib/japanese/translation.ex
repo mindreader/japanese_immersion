@@ -102,7 +102,7 @@ defmodule Japanese.Translation do
 
       page |> Japanese.Events.Page.translation_finished()
 
-      case page.story |> Story.get_by_name() do
+      case Story.get_by_name(page.story) do
         {:ok, story} -> story |> Japanese.Events.Story.pages_updated()
         _ -> :ok
       end
