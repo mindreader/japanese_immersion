@@ -3,8 +3,16 @@
     <title>Japanese Page {@page.number} of {@page.story}</title>
   </head>
   <body>
-    <h1>Japanese Page {@page.number} of {@page.story}</h1>
-    <pre><%= Phoenix.HTML.html_escape(@text) %></pre>
-    <a href={~p"/stories/#{@page.story}/#{@page.number}"}>Back to page</a>
+    <h1 class="text-lg font-semibold leading-8 text-zinc-800" style="margin-bottom: 1.5em;">
+      Page {@page.number} of story {@page.story}
+    </h1>
+    <pre style="margin-bottom: 2em;"><%= Phoenix.HTML.html_escape(@text) %></pre>
+    <a
+      href={~p"/stories/#{@story}/#{@page}"}
+      style="margin-top: 2em; display: inline-block;"
+      class="text-sm font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
+    >
+      <span class="hero-arrow-left-solid h-3 w-3"></span> Back to page
+    </a>
   </body>
 </html>
