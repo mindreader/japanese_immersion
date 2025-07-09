@@ -8,11 +8,25 @@
   </:actions>
 </.header>
 
-<div class="mt-8">
-  <%= if @live_action == :show do %>
-    <!-- TODO: Render translation here -->
-    <em>Translation view coming soon.</em>
-  <% end %>
+<div class="relative flex flex-col h-[60vh] mt-8">
+  <div class="flex-1 overflow-y-auto rounded border p-4 bg-white shadow">
+    <div class="whitespace-pre-line text-lg font-serif">
+      <%= @japanese_text || "(No Japanese text found)" %>
+    </div>
+    <div :if={@show_translation} class="mt-6 whitespace-pre-line text-blue-900 bg-blue-50 rounded p-3 border border-blue-200">
+      <!-- TODO: Render actual translation here -->
+      <em>English translation coming soon.</em>
+    </div>
+  </div>
+  <button
+    phx-click="toggle_translation"
+    class="fixed bottom-6 right-6 z-50 rounded-full bg-zinc-900 text-white px-6 py-3 shadow-lg hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+    aria-pressed={@show_translation}
+    aria-label={@show_translation && "Hide English" || "Show English"}
+    type="button"
+  >
+    <%= if @show_translation, do: "Hide English", else: "Show English" %>
+  </button>
 </div>
 
 <.back navigate={~p"/stories/#{@story}"}>Back to story</.back>

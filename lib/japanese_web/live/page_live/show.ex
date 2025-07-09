@@ -3,7 +3,7 @@ defmodule JapaneseWeb.PageLive.Show do
 
   @impl true
   def mount(_params, _session, socket) do
-    {:ok, socket}
+    {:ok, assign(socket, show_translation: false)}
   end
 
   @impl true
@@ -38,5 +38,10 @@ defmodule JapaneseWeb.PageLive.Show do
          |> put_flash(:error, "Page not found.")
          |> push_navigate(to: ~p"/stories/#{name}")}
     end
+  end
+
+  @impl true
+  def handle_event("toggle_translation", _params, socket) do
+    {:noreply, update(socket, :show_translation, &(!&1))}
   end
 end
