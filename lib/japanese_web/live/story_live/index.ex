@@ -46,6 +46,9 @@ defmodule JapaneseWeb.StoryLive.Index do
   @impl Phoenix.LiveView
   def handle_event("delete", %{"id" => name}, socket) do
     case Story.get_by_name(name) do
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Story not found")}
+
       {:ok, story} ->
         case Story.delete(story) do
           :ok ->
@@ -53,9 +56,6 @@ defmodule JapaneseWeb.StoryLive.Index do
 
           {:error, reason} ->
             {:noreply, put_flash(socket, :error, "Failed to delete story: #{inspect(reason)}")}
-
-          {:error, :not_found} ->
-            {:noreply, put_flash(socket, :error, "Story not found")}
         end
     end
   end

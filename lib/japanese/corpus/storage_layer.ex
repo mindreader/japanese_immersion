@@ -198,8 +198,8 @@ defmodule Japanese.Corpus.StorageLayer do
         Logger.info("Deleted story #{story} files: #{inspect(files)}")
         :ok
 
-      {:error, errors} ->
-        {:error, errors}
+      {:error, file, reason} ->
+        {:error, {file, reason}}
     end
   end
 
