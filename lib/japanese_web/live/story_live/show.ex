@@ -37,7 +37,6 @@ defmodule JapaneseWeb.StoryLive.Show do
          {:ok, japanese_text} <- Japanese.Corpus.Page.get_japanese_text(page_struct) do
       {:noreply,
        socket
-       |> assign(:live_action, :edit_page)
        |> assign(:edit_page_text, japanese_text)
        |> assign(:edit_page_error, nil)}
     else
@@ -50,7 +49,6 @@ defmodule JapaneseWeb.StoryLive.Show do
   def handle_event("add_page", _params, socket) do
     {:noreply,
      socket
-     |> assign(:live_action, :new_page)
      |> assign(:new_page_text, nil)
      |> assign(:new_page_error, nil)}
   end
@@ -63,14 +61,14 @@ defmodule JapaneseWeb.StoryLive.Show do
       {:noreply, assign(socket, new_page_error: "Text can't be blank")}
     else
       case Story.add_japanese_page(socket.assigns.story, text) do
-        {:ok, _page} ->
+        {:ok, page} ->
+          page |> Japanese.Translation.Service.translate_page()
           pages = Story.list_pages(socket.assigns.story)
 
           {:noreply,
            socket
            |> assign(:page_title, page_title(socket.assigns.live_action))
            |> assign(:pages, pages)
-           |> assign(:live_action, nil)
            |> assign(:new_page_text, nil)
            |> assign(:new_page_error, nil)}
 
@@ -111,7 +109,6 @@ defmodule JapaneseWeb.StoryLive.Show do
           {:noreply,
            socket
            |> assign(:pages, pages)
-           |> assign(:live_action, nil)
            |> assign(:edit_page_text, nil)
            |> assign(:edit_page_error, nil)
            |> push_patch(to: ~p"/stories/#{socket.assigns.story.name}")}

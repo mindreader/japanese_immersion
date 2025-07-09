@@ -22,6 +22,8 @@ defmodule Japanese.Translation.Service do
 
     @impl GenServer
     def handle_cast({:translate_page, %Japanese.Corpus.Page{} = page}, state) do
+      timeout = Service.timeout_ms()
+
       Task.Supervisor.async(Service.task_supervisor(), fn ->
         Logger.info("Translating story #{page.story} page #{page.number}")
 
@@ -30,10 +32,10 @@ defmodule Japanese.Translation.Service do
             Logger.info("Finished translating story #{page.story} page #{page.number}")
 
           {:error, reason} ->
-            Logger.error("Error translating story #{page.story} page #{page.number}: #{inspect(reason)}")
+            Logger.error("Error translating story #{page.story} page #{page.number}: #{inspect(reason)} after #{timeout}ms")
         end
       end)
-      |> Task.await(Service.timeout_ms())
+      |> Task.await(timeout)
 
       {:noreply, state}
     end
@@ -52,7 +54,7 @@ defmodule Japanese.Translation.Service do
       config = config()
 
       case config[:timeout_ms] do
-        nil -> 20 |> :timer.seconds()
+        nil -> 120 |> :timer.seconds()
         other -> other
       end
     end
