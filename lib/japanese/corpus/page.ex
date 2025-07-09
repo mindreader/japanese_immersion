@@ -56,7 +56,7 @@ defmodule Japanese.Corpus.Page do
   Gets the translation JSON for this page from the storage layer and returns it as a map.
   Returns {:ok, map} or {:error, reason}.
   """
-  @spec get_translation(t) :: {:ok, map} | {:error, term}
+  @spec get_translation(t) :: {:ok, Japanese.Translation.Json.translation_json()} | {:error, term}
   def get_translation(%__MODULE__{number: number, story: story}) do
     storage = StorageLayer.new()
     filename = StorageLayer.page_filename(storage, story, number, :translation)

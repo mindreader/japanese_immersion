@@ -3,9 +3,13 @@ defmodule Japanese.Translation.Json do
   Provides functions to pair Japanese and English (before and after translation) and return JSON.
   """
 
+  @type translation_entry :: %{japanese: String.t(), english: String.t()} | %{paragraph_break: true}
+  @type translation_json :: %{title: String.t(), translation: [translation_entry]}
+
   @doc """
   Takes Japanese and English text, before and after translation, and returns JSON.
   """
+  @spec format_to_translation_json(String.t()) :: String.t()
   def format_to_translation_json(translation) do
     translation =
       translation
@@ -30,6 +34,7 @@ defmodule Japanese.Translation.Json do
     |> Jason.encode!(pretty: pretty_json())
   end
 
+  @spec decode_translation(String.t()) :: {:ok, translation_json} | {:error, term}
   def decode_translation(json) do
     json |> Jason.decode(keys: &decode_key/1)
   end
