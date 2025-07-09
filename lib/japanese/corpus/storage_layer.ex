@@ -7,6 +7,8 @@ defmodule Japanese.Corpus.StorageLayer do
   separate files (e.g., "1j.md" for Japanese, "1e.md" for English).
   """
 
+  require Logger
+
   @enforce_keys [:working_directory]
   defstruct working_directory: nil
 
@@ -192,8 +194,12 @@ defmodule Japanese.Corpus.StorageLayer do
 
     File.rm_rf(story_dir)
     |> case do
-      {_, []} -> :ok
-      {_, errors} -> {:error, errors}
+      {:ok, files} ->
+        Logger.info("Deleted story #{story} files: #{inspect(files)}")
+        :ok
+
+      {:error, errors} ->
+        {:error, errors}
     end
   end
 
@@ -249,7 +255,11 @@ defmodule Japanese.Corpus.StorageLayer do
   @spec update_japanese_page(t(), String.t(), integer(), String.t()) :: :ok | {:error, term}
   def update_japanese_page(storage, story, number, new_text) do
     filename = page_filename(storage, story, number, :japanese)
-    write_page(storage, story, filename, new_text)
+    result = write_page(storage, story, filename, new_text)
+    # Always delete the translation file after updating Japanese text
+    translation_filename = page_filename(storage, story, number, :translation)
+    _ = delete_file(storage, story, translation_filename)
+    result
   end
 
   @doc """

@@ -20,9 +20,11 @@ defmodule Japanese.Corpus.Story do
 
     case StorageLayer.pair_files(storage, name) do
       {:ok, pairs} ->
-        Enum.map(pairs, fn %{number: number, translation: translation} ->
+        pairs
+        |> Enum.map(fn %{number: number, translation: translation} ->
           %Page{number: number, story: name, translated?: not is_nil(translation)}
         end)
+        |> Enum.sort_by(&(-&1.number))
 
       _ ->
         []

@@ -1,0 +1,39 @@
+Interleave the translation with the original text, so that each paragraph has the original japanese, then its english translation. When a scene transition is sensed add a !CONTINUED! marker in between the paragraphs.
+
+For example, when presented with the following text:
+
+二十年経った私の暮らし　①
+
+
+「ふぅ……」
+
+
+　私は家の裏手の畑で、育てている作物の水やりをして一息をつく。
+
+　私が住んでいる家は、森の中にぽつんと存在している。一人暮らしだが、六部屋もあり十分な広さの平屋だ。レンガ造りの赤い屋根の一軒家。防御魔法も施されていて、滅多なことで壊れることはないだろうと言われている。
+
+　また王都でも有数の大工の手によってつくられた家というのもあって、外面も綺麗で、私はこの家の見た目を気に入っている。
+
+　今の私では一から作ってもらおうとしても間違っても作ってもらえないようなとても豪華な家だ。そんな家が森の中に存在しているって何だかアンバランスな感じがするけど、その不釣り合いだけど、何だかバランスが取れている様子も私は気に入っている。
+
+You should translate the text as follows:
+
+二十年経った私の暮らし　①
+Twenty years have passed in my life ①
+
+!CONTINUED!
+
+「ふぅ……」
+"Phew..."
+
+私は家の裏手の畑で、育てている作物の水やりをして一息をつく。
+I take a breather after watering the crops I'm growing in the field behind my house.
+
+私が住んでいる家は、森の中にぽつんと存在している。一人暮らしだが、六部屋もあり十分な広さの平屋だ。レンガ造りの赤い屋根の一軒家。防御魔法も施されていて、滅多なことで壊れることはないだろうと言われている。
+The house I live in exists all alone in the forest. I live alone, but it's a single-story house with six rooms and sufficient space. A brick house with a red roof. Defensive magic has been applied to it, and it's said that it won't break easily under normal circumstances.
+
+また王都でも有数の大工の手によってつくられた家というのもあって、外面も綺麗で、私はこの家の見た目を気に入っている。
+Also, being a house made by one of the royal capital's leading carpenters, the exterior is beautiful, and I like the appearance of this house.
+
+今の私では一から作ってもらおうとしても間違っても作ってもらえないようなとても豪華な家だ。そんな家が森の中に存在しているって何だかアンバランスな感じがするけど、その不釣り合いだけど、何だかバランスが取れている様子も私は気に入っている。
+It's such a luxurious house that even if I tried to have it built from scratch now, I definitely wouldn't be able to get it made. Having such a house exist in the forest feels somehow unbalanced, but I also like how it's mismatched yet somehow balanced.

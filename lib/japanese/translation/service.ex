@@ -15,7 +15,9 @@ defmodule Japanese.Translation.Service do
     alias Japanese.Translation.Service
 
     def start_link(opts \\ []) do
-      GenServer.start_link(__MODULE__, nil, opts)
+      # TODO we will record each task age page / story so that we can cancel ongoing tasks and prevent duplicate tasks from
+      # being created on the same page / story.
+      GenServer.start_link(__MODULE__, %{}, opts)
     end
 
     @impl GenServer

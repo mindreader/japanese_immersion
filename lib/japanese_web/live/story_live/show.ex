@@ -16,6 +16,7 @@ defmodule JapaneseWeb.StoryLive.Show do
 
       new_story |> Japanese.Events.Story.subscribe_story_pages()
     end
+
     :ok
   end
 
@@ -25,6 +26,7 @@ defmodule JapaneseWeb.StoryLive.Show do
       {:ok, story} ->
         pages = Story.list_pages(story)
         old_story = socket.assigns[:story]
+
         if Phoenix.LiveView.connected?(socket) do
           manage_story_pubsub_subscription(old_story, story)
         end
@@ -50,16 +52,15 @@ defmodule JapaneseWeb.StoryLive.Show do
   @impl Phoenix.LiveView
   def handle_event("edit_page", %{"number" => number}, socket) do
     with {page_number, ""} <- Integer.parse(number),
-         page_struct when not is_nil(page_struct) <-
+         page when not is_nil(page) <-
            Enum.find(socket.assigns.pages, &(&1.number == page_number)),
-         {:ok, japanese_text} <- Japanese.Corpus.Page.get_japanese_text(page_struct) do
-
-
+         {:ok, japanese_text} <- Japanese.Corpus.Page.get_japanese_text(page) do
       {:noreply,
        socket
        |> assign(:edit_page_modal, true)
        |> assign(:edit_page_text, japanese_text)
-       |> assign(:edit_page_error, nil)}
+       |> assign(:edit_page_error, nil)
+       |> assign(:edit_page, page)}
     else
       _ ->
         {:noreply, put_flash(socket, :error, "Could not load page for editing.")}
@@ -133,6 +134,7 @@ defmodule JapaneseWeb.StoryLive.Show do
     else
       case Japanese.Corpus.Page.update_japanese_text(page, text) do
         :ok ->
+          Japanese.Translation.Service.translate_page(page)
           pages = Story.list_pages(socket.assigns.story)
 
           {:noreply,
@@ -142,6 +144,7 @@ defmodule JapaneseWeb.StoryLive.Show do
            |> assign(:new_page_modal, false)
            |> assign(:edit_page_text, nil)
            |> assign(:edit_page_error, nil)
+           |> assign(:edit_page, nil)
            |> push_patch(to: ~p"/stories/#{socket.assigns.story.name}")}
 
         {:error, reason} ->

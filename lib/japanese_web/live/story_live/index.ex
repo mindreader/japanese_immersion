@@ -9,7 +9,7 @@ defmodule JapaneseWeb.StoryLive.Index do
     socket =
       socket
       |> Phoenix.LiveView.stream_configure(:stories,
-        dom_id: fn %Japanese.Corpus.Story{name: name} -> "story-#{name}" end
+        dom_id: fn %Story{name: name} -> "story-#{name}" end
       )
 
     {:ok, stream(socket, :stories, Corpus.list_stories())}
@@ -45,8 +45,18 @@ defmodule JapaneseWeb.StoryLive.Index do
 
   @impl Phoenix.LiveView
   def handle_event("delete", %{"id" => name}, socket) do
-    story = %Story{name: name}
-    :ok = Story.delete(story)
-    {:noreply, stream_delete(socket, :stories, story)}
+    case Story.get_by_name(name) do
+      {:ok, story} ->
+        case Story.delete(story) do
+          :ok ->
+            {:noreply, stream_delete(socket, :stories, story)}
+
+          {:error, reason} ->
+            {:noreply, put_flash(socket, :error, "Failed to delete story: #{inspect(reason)}")}
+
+          {:error, :not_found} ->
+            {:noreply, put_flash(socket, :error, "Story not found")}
+        end
+    end
   end
 end

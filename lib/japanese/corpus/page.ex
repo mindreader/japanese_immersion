@@ -22,7 +22,17 @@ defmodule Japanese.Corpus.Page do
   """
   @spec update_japanese_text(t, String.t()) :: :ok | {:error, term}
   def update_japanese_text(%__MODULE__{number: number, story: story}, new_text) do
-    StorageLayer.new() |> StorageLayer.update_japanese_page(story, number, new_text)
+    case StorageLayer.new() |> StorageLayer.update_japanese_page(story, number, new_text) do
+      :ok ->
+        Japanese.Translation.Service.translate_page(%__MODULE__{
+          number: number,
+          story: story,
+          translated?: false
+        })
+
+      error ->
+        error
+    end
   end
 
   @doc """

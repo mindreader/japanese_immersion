@@ -18,20 +18,29 @@
     <.link navigate={~p"/stories/#{@story}/#{page}"} class="text-blue-600 hover:underline">
       Page #{page.number}
     </.link>
-    <span :if={!page.translated?} class="ml-2 text-yellow-600">untranslated</span>
-    <button
-      phx-click="delete_page"
-      phx-value-number={page.number}
-      class="ml-2 text-red-600 hover:underline"
-    >
-      Delete
-    </button>
+    <span class={[
+      "ml-2 w-28 inline-block text-center font-semibold",
+      if(page.translated?, do: "text-green-600", else: "text-yellow-600")
+    ]}>
+      <%= if page.translated? do %>
+        translated
+      <% else %>
+        untranslated
+      <% end %>
+    </span>
     <button
       phx-click="edit_page"
       phx-value-number={page.number}
       class="ml-2 text-green-600 hover:underline"
     >
       Edit
+    </button>
+    <button
+      phx-click="delete_page"
+      phx-value-number={page.number}
+      class="ml-2 text-red-600 hover:underline"
+    >
+      Delete
     </button>
     <!-- TODO: show created_at, modified_at, size, etc. -->
   </li>

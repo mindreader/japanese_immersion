@@ -135,9 +135,7 @@ defmodule Japanese.Translation do
     # TODO there is no need to have newlines between each original line and its single translation.
     interleaved_part =
       if interleaved do
-        " Interleave the translation with the original text, so that we alternate between the original and the translation using the original text's paragraphs as the boundaries, ensuring that there is one newline between each pair. If the text seems to be transitioning from one scene to another, add a single line with the word '!CONTINUED!' between the two paragraphs."
-      else
-        ""
+        " " <> File.read!("priv/translation/interleave.txt")
       end
 
     extras_part =

@@ -3,6 +3,11 @@ defmodule JapaneseWeb.Telemetry do
   import Telemetry.Metrics
 
   @impl Supervisor
+
+  def start_link(arg) do
+    Supervisor.start_link(__MODULE__, arg, name: __MODULE__)
+  end
+
   def init(_arg) do
     children = [
       # Telemetry poller will execute the given period measurements
