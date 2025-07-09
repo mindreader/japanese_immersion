@@ -30,33 +30,19 @@ defmodule JapaneseWeb.StoryLive.Show do
     end
   end
 
-  @impl true
-  def handle_params(%{"name" => name, "page" => page}, _, socket) do
-    case Integer.parse(page) do
-      {selected_page, ""} ->
-        case Story.get_by_name(name) do
-          {:ok, story} ->
-            pages = Story.list_pages(story)
-
-            {:noreply,
-             socket
-             |> assign(:page_title, "Show Page #{selected_page}")
-             |> assign(:story, story)
-             |> assign(:pages, pages)
-             |> assign(:selected_page, selected_page)}
-
-          {:error, :not_found} ->
-            {:noreply,
-             socket
-             |> put_flash(:error, "Story \\#{name} not found.")
-             |> push_patch(to: "/stories")}
-        end
-
+ @impl true
+  def handle_event("edit_page", %{"number" => number}, socket) do
+    with {page_number, ""} <- Integer.parse(number),
+         page_struct when not is_nil(page_struct) <- Enum.find(socket.assigns.pages, &(&1.number == page_number)),
+         {:ok, japanese_text} <- Japanese.Corpus.Page.get_japanese_text(page_struct) do
+      {:noreply,
+       socket
+       |> assign(:live_action, :edit_page)
+       |> assign(:edit_page_text, japanese_text)
+       |> assign(:edit_page_error, nil)}
+    else
       _ ->
-        {:noreply,
-         socket
-         |> put_flash(:error, "Invalid page number.")
-         |> push_patch(to: ~p"/stories/#{name}")}
+        {:noreply, put_flash(socket, :error, "Could not load page for editing.")}
     end
   end
 
@@ -82,6 +68,7 @@ defmodule JapaneseWeb.StoryLive.Show do
 
           {:noreply,
            socket
+           |> assign(:page_title, page_title(socket.assigns.live_action))
            |> assign(:pages, pages)
            |> assign(:live_action, nil)
            |> assign(:new_page_text, nil)
@@ -108,6 +95,29 @@ defmodule JapaneseWeb.StoryLive.Show do
         {:noreply, put_flash(socket, :error, "Failed to delete page: #{inspect(reason)}")}
       _ ->
         {:noreply, put_flash(socket, :error, "Unexpected error deleting page.")}
+    end
+  end
+
+  @impl true
+  def handle_event("update_page", %{"japanese_text" => text}, socket) do
+    text = String.trim(text || "")
+    page = socket.assigns.edit_page
+    if is_nil(page) or text == "" do
+      {:noreply, assign(socket, edit_page_error: "Text can't be blank")}
+    else
+      case Japanese.Corpus.Page.update_japanese_text(page, text) do
+        :ok ->
+          pages = Story.list_pages(socket.assigns.story)
+          {:noreply,
+           socket
+           |> assign(:pages, pages)
+           |> assign(:live_action, nil)
+           |> assign(:edit_page_text, nil)
+           |> assign(:edit_page_error, nil)
+           |> push_patch(to: ~p"/stories/#{socket.assigns.story.name}")}
+        {:error, reason} ->
+          {:noreply, assign(socket, edit_page_error: inspect(reason))}
+      end
     end
   end
 

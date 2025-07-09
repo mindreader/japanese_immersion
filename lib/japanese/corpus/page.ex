@@ -38,6 +38,15 @@ defmodule Japanese.Corpus.Page do
   end
 
   @doc """
+  Updates the Japanese text for this page.
+  Returns :ok or {:error, reason}.
+  """
+  @spec update_japanese_text(t, String.t()) :: :ok | {:error, term}
+  def update_japanese_text(%__MODULE__{number: number, story: story}, new_text) do
+    StorageLayer.new() |> StorageLayer.update_japanese_page(story, number, new_text)
+  end
+
+  @doc """
   Deletes both the Japanese and English page files for this page.
   Returns :ok or {:error, reason}.
   """

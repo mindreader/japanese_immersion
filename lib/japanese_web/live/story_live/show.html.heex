@@ -1,6 +1,5 @@
 <.header>
   Story {@story.name}
-  <:subtitle>This is a story record from your database.</:subtitle>
   <:actions>
     <.button phx-click="add_page" class="ml-2">Add Page</.button>
     <.link patch={~p"/stories/#{@story}/edit"} phx-click={JS.push_focus()}>
@@ -26,6 +25,13 @@
       class="ml-2 text-red-600 hover:underline"
     >
       Delete
+    </button>
+    <button
+      phx-click="edit_page"
+      phx-value-number={page.number}
+      class="ml-2 text-green-600 hover:underline"
+    >
+      Edit
     </button>
     <!-- TODO: show created_at, modified_at, size, etc. -->
   </li>
@@ -69,4 +75,26 @@
     </:actions>
   </.simple_form>
   <.error :if={@new_page_error}>{@new_page_error}</.error>
+</.modal>
+
+<.modal
+  :if={@live_action == :edit_page}
+  id="edit-page-modal"
+  show
+  on_cancel={JS.patch(~p"/stories/#{@story}")}
+>
+  <.simple_form for={%{}} as={:page} phx-submit="update_page">
+    <.input
+      name="japanese_text"
+      type="textarea"
+      label="Japanese Text"
+      value={@edit_page_text || ""}
+      rows="12"
+    />
+    <:actions>
+      <.button type="submit">Update Page</.button>
+      <.button type="button" phx-click={JS.patch(~p"/stories/#{@story}")}>Cancel</.button>
+    </:actions>
+  </.simple_form>
+  <.error :if={@edit_page_error}>{@edit_page_error}</.error>
 </.modal>

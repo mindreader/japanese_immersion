@@ -243,6 +243,16 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
+  Update the Japanese text for a page, given the story, page number, and new text.
+  Returns :ok or {:error, reason}.
+  """
+  @spec update_japanese_page(t(), String.t(), integer(), String.t()) :: :ok | {:error, term}
+  def update_japanese_page(storage, story, number, new_text) do
+    filename = page_filename(storage, story, number, :japanese)
+    write_page(storage, story, filename, new_text)
+  end
+
+  @doc """
   Get the filename for a specific page number and type.
   Returns a string like "1j.txt" or "1tr.yaml".
   """
