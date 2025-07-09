@@ -64,7 +64,8 @@ defmodule Japanese.MixProject do
       # using fork of mimic because stub removal is a major feature that hasn't been released yet
       {:mimic, github: "mindreader/mimic", only: :test},
       {:ex_machina, "~> 2.8.0", only: :test},
-      {:dialyxir, "~> 1.4", only: :dev, runtime: false}
+      {:dialyxir, "~> 1.4", only: :dev, runtime: false},
+      {:phoenix_pubsub, "~> 2.1"}
     ]
   end
 

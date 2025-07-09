@@ -81,6 +81,39 @@ defmodule Japanese.Translation do
     |> handle_response(:en_to_ja)
   end
 
+  @doc """
+  Translates the japanese page synchronously. This can often take some time...
+
+  If you want to translate a page asynchronously, use the `Japanese.Translation.Service` module.
+  """
+  @spec translate_page(Japanese.Corpus.Page.t()) :: :ok | {:error, term}
+  def translate_page(%Japanese.Corpus.Page{translated?: true}), do: {:error, :already_translated}
+  def translate_page(page) do
+    alias Japanese.Corpus.Story
+    alias Japanese.Corpus.Page
+
+    with {:ok, japanese_text} <- Page.get_japanese_text(page),
+         %__MODULE__{text: interleaved_translation} <-
+           ja_to_en(japanese_text, interleaved: true) do
+      json = Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
+
+      Page.update_translation(page, json)
+
+      page |> Japanese.Events.Page.translation_finished()
+
+      case page.story |> Story.get_by_name() do
+        {:ok, story} -> story |> Japanese.Events.Story.pages_updated()
+        _ -> :ok
+      end
+
+      :ok
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defdelegate translate_page_async(page), to: Japanese.Translation.Service, as: :translate_page
+
   defp build_ja_to_en_prompt(opts) do
     literalness = Keyword.get(opts, :literalness, :literal)
     interleaved = Keyword.get(opts, :interleaved, false)
@@ -130,8 +163,9 @@ defmodule Japanese.Translation do
     Anthropix.init(api_key)
   end
 
-  defp call_anthropix(system_prompt, user_text) do
+  defp call_anthropix(system_prompt, user_text, opts \\ []) do
     client = build_client()
+    retry = Keyword.get(opts, :retries, 3)
 
     Anthropix.chat(
       client,
@@ -144,6 +178,12 @@ defmodule Japanese.Translation do
     |> case do
       {:ok, anthropix_result} ->
         Response.parse_response(anthropix_result)
+      {:error, %Req.TransportError{reason: :closed}} = error ->
+        if retry > 0 do
+          call_anthropix(system_prompt, user_text, Keyword.put(opts, :retries, retry - 1))
+        else
+          error
+        end
 
       {:error, err} ->
         {:error, err}

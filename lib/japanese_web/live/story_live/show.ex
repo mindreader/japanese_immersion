@@ -19,6 +19,8 @@ defmodule JapaneseWeb.StoryLive.Show do
          |> assign(:page_title, page_title(socket.assigns.live_action))
          |> assign(:story, story)
          |> assign(:pages, pages)
+         |> assign(:edit_page_modal, false)
+         |> assign(:new_page_modal, false)
          |> assign(:new_page_text, nil)
          |> assign(:new_page_error, nil)}
 
@@ -37,6 +39,7 @@ defmodule JapaneseWeb.StoryLive.Show do
          {:ok, japanese_text} <- Japanese.Corpus.Page.get_japanese_text(page_struct) do
       {:noreply,
        socket
+       |> assign(:edit_page_modal, true)
        |> assign(:edit_page_text, japanese_text)
        |> assign(:edit_page_error, nil)}
     else
@@ -49,6 +52,7 @@ defmodule JapaneseWeb.StoryLive.Show do
   def handle_event("add_page", _params, socket) do
     {:noreply,
      socket
+     |> assign(:new_page_modal, true)
      |> assign(:new_page_text, nil)
      |> assign(:new_page_error, nil)}
   end
@@ -69,8 +73,11 @@ defmodule JapaneseWeb.StoryLive.Show do
            socket
            |> assign(:page_title, page_title(socket.assigns.live_action))
            |> assign(:pages, pages)
+           |> assign(:edit_page_modal, false)
+           |> assign(:new_page_modal, false)
            |> assign(:new_page_text, nil)
-           |> assign(:new_page_error, nil)}
+           |> assign(:new_page_error, nil)
+           |> push_patch(to: ~p"/stories/#{socket.assigns.story.name}")}
 
         {:error, reason} ->
           {:noreply, assign(socket, new_page_error: inspect(reason))}
@@ -109,6 +116,8 @@ defmodule JapaneseWeb.StoryLive.Show do
           {:noreply,
            socket
            |> assign(:pages, pages)
+           |> assign(:edit_page_modal, false)
+           |> assign(:new_page_modal, false)
            |> assign(:edit_page_text, nil)
            |> assign(:edit_page_error, nil)
            |> push_patch(to: ~p"/stories/#{socket.assigns.story.name}")}

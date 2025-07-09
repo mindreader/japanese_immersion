@@ -56,7 +56,7 @@
 </.modal>
 
 <.modal
-  :if={@live_action == :new_page}
+  :if={@new_page_modal}
   id="new-page-modal"
   show
   on_cancel={JS.patch(~p"/stories/#{@story}")}
@@ -78,7 +78,7 @@
 </.modal>
 
 <.modal
-  :if={@live_action == :edit_page}
+  :if={@edit_page_modal}
   id="edit-page-modal"
   show
   on_cancel={JS.patch(~p"/stories/#{@story}")}

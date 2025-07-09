@@ -17,33 +17,21 @@ defmodule Japanese.Corpus.Page do
   defstruct number: nil, story: nil, translated?: false
 
   @doc """
-  Translates the Japanese text for this page to English using the Japanese.Translation module.
-  Returns the translation result (not written to file). This could take some time...
-  """
-  @spec translate_page(t) :: :ok | {:error, term}
-  def translate_page(%__MODULE__{translated?: true}), do: {:error, :already_translated}
-  def translate_page(page) do
-    with {:ok, japanese_text} <- get_japanese_text(page),
-         %Japanese.Translation{text: interleaved_translation} <-
-           Japanese.Translation.ja_to_en(japanese_text, interleaved: true) do
-      json = Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
-
-      StorageLayer.new()
-      |> StorageLayer.write_english_translation(page.story, page.number, json)
-
-      :ok
-    else
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  @doc """
   Updates the Japanese text for this page.
   Returns :ok or {:error, reason}.
   """
   @spec update_japanese_text(t, String.t()) :: :ok | {:error, term}
   def update_japanese_text(%__MODULE__{number: number, story: story}, new_text) do
     StorageLayer.new() |> StorageLayer.update_japanese_page(story, number, new_text)
+  end
+
+  @doc """
+  Updates the English translation for this page.
+  Returns :ok or {:error, reason}.
+  """
+  @spec update_translation(t, String.t()) :: :ok | {:error, term}
+  def update_translation(%__MODULE__{number: number, story: story}, new_translation) do
+    StorageLayer.new() |> StorageLayer.write_english_translation(story, number, new_translation)
   end
 
   @doc """

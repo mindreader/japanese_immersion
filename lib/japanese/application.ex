@@ -16,8 +16,7 @@ defmodule Japanese.Application do
       {Finch, name: Japanese.Finch},
       {Task.Supervisor, name: Japanese.Task.Supervisor},
       {Japanese.Translation.Service.Server, name: Japanese.Translation.Service},
-      # Start a worker by calling: Japanese.Worker.start_link(arg)
-      # {Japanese.Worker, arg},
+
       # Start to serve requests, typically the last entry
       JapaneseWeb.Endpoint
     ]

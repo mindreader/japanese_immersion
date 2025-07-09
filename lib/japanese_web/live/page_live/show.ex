@@ -1,4 +1,5 @@
 defmodule JapaneseWeb.PageLive.Show do
+  require Logger
   use JapaneseWeb, :live_view
 
   @impl true
@@ -12,6 +13,14 @@ defmodule JapaneseWeb.PageLive.Show do
     with {page_number, ""} <- Integer.parse(page_param),
          {:ok, story} <- Japanese.Corpus.Story.get_by_name(name),
          {:ok, page} <- Japanese.Corpus.Story.get_page(story, page_number) do
+
+
+
+      if connected?(socket) do
+        old_page = socket.assigns[:page]
+        manage_pubsub_subscription(old_page, page)
+      end
+
       socket =
         socket
         |> assign(:page_title, "Page #{page_number} of #{story.name}")
@@ -33,6 +42,42 @@ defmodule JapaneseWeb.PageLive.Show do
          socket
          |> put_flash(:error, "Page not found.")
          |> push_navigate(to: ~p"/stories/#{name}")}
+    end
+  end
+
+  defp manage_pubsub_subscription(old_page, new_page) do
+    if old_page != new_page do
+      if old_page do
+        old_page |> Japanese.Events.Page.unsubscribe_page()
+      end
+
+      new_page |> Japanese.Events.Page.subscribe_page()
+    end
+
+    :ok
+  end
+
+  @impl true
+  def handle_info({:translation_finished, %{story: story, page: page_number}}, socket) do
+    # Refetch story and page, then update assigns
+    with {:ok, story} <- Japanese.Corpus.Story.get_by_name(story),
+         {:ok, page} <- Japanese.Corpus.Story.get_page(story, page_number) do
+      translation =
+        case Japanese.Corpus.Page.get_translation(page) do
+          {:ok, content} -> content
+          _ -> nil
+        end
+
+      socket =
+        socket
+        |> assign(:story, story)
+        |> assign(:page, page)
+        |> assign(:translation, translation)
+
+      {:noreply, socket}
+    else
+      _ ->
+        {:noreply, socket}
     end
   end
 end

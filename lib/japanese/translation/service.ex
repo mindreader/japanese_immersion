@@ -1,5 +1,9 @@
 defmodule Japanese.Translation.Service do
 
+  @doc """
+  Asynchronously translates a page. If you want to know when the translation is finished,
+  you can subscribe to the `:translation_finished` event.
+  """
   # Public API to cast a translation instruction for a Page
   def translate_page(%Japanese.Corpus.Page{} = page) do
     GenServer.cast(__MODULE__, {:translate_page, page})
@@ -27,10 +31,9 @@ defmodule Japanese.Translation.Service do
       Task.Supervisor.async(Service.task_supervisor(), fn ->
         Logger.info("Translating story #{page.story} page #{page.number}")
 
-        case Japanese.Corpus.Page.translate_page(page) do
+        case Japanese.Translation.translate_page(page) do
           :ok ->
             Logger.info("Finished translating story #{page.story} page #{page.number}")
-
           {:error, reason} ->
             Logger.error("Error translating story #{page.story} page #{page.number}: #{inspect(reason)} after #{timeout}ms")
         end
