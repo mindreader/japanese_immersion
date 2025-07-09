@@ -3,7 +3,8 @@ defmodule Japanese.Translation.Json do
   Provides functions to pair Japanese and English (before and after translation) and return JSON.
   """
 
-  @type translation_entry :: %{japanese: String.t(), english: String.t()} | %{paragraph_break: true}
+  @type translation_entry ::
+          %{japanese: String.t(), english: String.t()} | %{paragraph_break: true}
   @type translation_json :: %{title: String.t(), translation: [translation_entry]}
 
   @doc """
@@ -28,7 +29,6 @@ defmodule Japanese.Translation.Json do
           end)
           |> Enum.reject(&is_nil/1)
       end)
-
 
     %{"title" => "TODO", "translation" => translation}
     |> Jason.encode!(pretty: pretty_json())
@@ -57,6 +57,7 @@ defmodule Japanese.Translation.Json do
 
   defp pretty_json do
     setting = config()
+
     if !is_nil(setting[:pretty_json]) do
       setting[:pretty_json]
     else

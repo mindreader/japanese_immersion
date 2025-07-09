@@ -21,7 +21,8 @@ defmodule Japanese.Corpus.Page do
   @spec translate_page(t) :: :ok | {:error, term}
   def translate_page(page) do
     with {:ok, japanese_text} <- get_japanese_text(page),
-         %Japanese.Translation{text: interleaved_translation} <- Japanese.Translation.ja_to_en(japanese_text, interleaved: true) do
+         %Japanese.Translation{text: interleaved_translation} <-
+           Japanese.Translation.ja_to_en(japanese_text, interleaved: true) do
       json = Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
 
       StorageLayer.new()
@@ -65,7 +66,8 @@ defmodule Japanese.Corpus.Page do
       {:ok, json} ->
         json |> Japanese.Translation.Json.decode_translation()
 
-      error -> error
+      error ->
+        error
     end
   end
 

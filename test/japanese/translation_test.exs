@@ -71,15 +71,17 @@ defmodule Test.Japanese.Translation do
   describe "ja_to_en/2 with mocked Anthropix" do
     test "returns a Translation struct on success" do
       Mimic.expect(Anthropix, :chat, fn _client, _opts ->
-        {:ok, %{
-          "id" => "msg_123",
-          "model" => "claude-sonnet-4-20250514",
-          "role" => "assistant",
-          "type" => "message",
-          "content" => [%{"type" => "text", "text" => "This is a test"}],
-          "usage" => %{"input_tokens" => 10, "output_tokens" => 5, "service_tier" => "standard"}
-        }}
+        {:ok,
+         %{
+           "id" => "msg_123",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "content" => [%{"type" => "text", "text" => "This is a test"}],
+           "usage" => %{"input_tokens" => 10, "output_tokens" => 5, "service_tier" => "standard"}
+         }}
       end)
+
       result = Translation.ja_to_en("テスト", [])
       assert %Translation{text: "This is a test", usage: usage} = result
       assert usage.input_tokens == 10
@@ -95,15 +97,17 @@ defmodule Test.Japanese.Translation do
   describe "en_to_ja/2 with mocked Anthropix" do
     test "returns a map with :text on success" do
       Mimic.expect(Anthropix, :chat, fn _client, _opts ->
-        {:ok, %{
-          "id" => "msg_456",
-          "model" => "claude-sonnet-4-20250514",
-          "role" => "assistant",
-          "type" => "message",
-          "content" => [%{"type" => "text", "text" => "これはテストです"}],
-          "usage" => %{"input_tokens" => 12, "output_tokens" => 6, "service_tier" => "standard"}
-        }}
+        {:ok,
+         %{
+           "id" => "msg_456",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "content" => [%{"type" => "text", "text" => "これはテストです"}],
+           "usage" => %{"input_tokens" => 12, "output_tokens" => 6, "service_tier" => "standard"}
+         }}
       end)
+
       result = Translation.en_to_ja("This is a test", [])
       assert %{text: "これはテストです"} = result
     end

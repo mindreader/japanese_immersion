@@ -1,8 +1,10 @@
 <html>
-  <head><title>Japanese Page <%= @page.number %> of <%= @page.story %></title></head>
+  <head>
+    <title>Japanese Page {@page.number} of {@page.story}</title>
+  </head>
   <body>
-    <h1>Japanese Page <%= @page.number %> of <%= @page.story %></h1>
+    <h1>Japanese Page {@page.number} of {@page.story}</h1>
     <pre><%= Phoenix.HTML.html_escape(@text) %></pre>
     <a href={~p"/stories/#{@page.story}/#{@page.number}"}>Back to page</a>
   </body>
-</html> 
+</html>

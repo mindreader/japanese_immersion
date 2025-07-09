@@ -100,6 +100,7 @@ defmodule Japanese.Corpus.Story do
   @spec get_page(t(), integer()) :: {:ok, Page.t()} | {:error, :not_found}
   def get_page(story, page_number) do
     pages = list_pages(story)
+
     case Enum.find(pages, &(&1.number == page_number)) do
       nil -> {:error, :not_found}
       page -> {:ok, page}

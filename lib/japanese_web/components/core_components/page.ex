@@ -12,7 +12,10 @@ defmodule JapaneseWeb.CoreComponents.Page do
     * `:content` - the translation map as specified in Japanese.Translation.Json (default: nil)
   """
   attr :id, :string, required: true, doc: "the unique id for the page component"
-  attr :content, :map, default: nil, doc: "the translation map as specified in Japanese.Translation.Json"
+
+  attr :content, :map,
+    default: nil,
+    doc: "the translation map as specified in Japanese.Translation.Json"
 
   def translation(assigns) do
     ~H"""
@@ -23,10 +26,13 @@ defmodule JapaneseWeb.CoreComponents.Page do
             <div style="height: 1.5em;"></div>
           <% else %>
             <div class="font-serif text-lg">
-              <%= entry.japanese %>
+              {entry.japanese}
             </div>
-            <div class="tr-eng text-blue-900 bg-blue-50 rounded p-2 border border-blue-200 mb-4" style="visibility: hidden;">
-              <%= entry.english %>
+            <div
+              class="tr-eng text-blue-900 bg-blue-50 rounded p-2 border border-blue-200 mb-4"
+              style="visibility: hidden;"
+            >
+              {entry.english}
             </div>
           <% end %>
         <% end %>

@@ -10,10 +10,10 @@ defmodule JapaneseWeb.PageLive.Show do
   @spec handle_params(map(), any(), any()) :: {:noreply, map()}
   def handle_params(%{"name" => name, "page" => page_param}, _uri, socket) do
     action = socket.assigns.live_action
+
     with {page_number, ""} <- Integer.parse(page_param),
          {:ok, story} <- Japanese.Corpus.Story.get_by_name(name),
          {:ok, page} <- Japanese.Corpus.Story.get_page(story, page_number) do
-
       socket =
         socket
         |> assign(:page_title, "Page #{page_number} of #{story.name}")
@@ -36,6 +36,7 @@ defmodule JapaneseWeb.PageLive.Show do
           {:ok, content} -> content
           _ -> nil
         end
+
       socket = assign(socket, :translation, translation)
 
       {:noreply, socket}
