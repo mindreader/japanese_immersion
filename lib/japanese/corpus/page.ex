@@ -52,6 +52,24 @@ defmodule Japanese.Corpus.Page do
     StorageLayer.new() |> StorageLayer.get_japanese_text(story, number)
   end
 
+  @doc """
+  Gets the translation JSON for this page from the storage layer and returns it as a map.
+  Returns {:ok, map} or {:error, reason}.
+  """
+  @spec get_translation(t) :: {:ok, map} | {:error, term}
+  def get_translation(%__MODULE__{number: number, story: story}) do
+    storage = StorageLayer.new()
+    filename = StorageLayer.page_filename(storage, story, number, :translation)
+    file_path = Path.join([storage.working_directory, story, filename])
+
+    case File.read(file_path) do
+      {:ok, json} ->
+        json |> Japanese.Translation.Json.decode_translation()
+
+      error -> error
+    end
+  end
+
   defimpl Phoenix.Param, for: Japanese.Corpus.Page do
     def to_param(%Japanese.Corpus.Page{number: number}), do: to_string(number)
   end

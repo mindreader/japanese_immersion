@@ -30,6 +30,21 @@ defmodule Japanese.Translation.Json do
     |> Jason.encode!(pretty: pretty_json())
   end
 
+  def decode_translation(json) do
+    json |> Jason.decode(keys: &decode_key/1)
+  end
+
+  # allow us to decode into atoms safely
+  defp decode_key(x) do
+    case x do
+      "japanese" -> :japanese
+      "english" -> :english
+      "translation" -> :translation
+      "paragraph_break" -> :paragraph_break
+      _ -> raise "#{__MODULE__}: Unknown key: #{x}"
+    end
+  end
+
   defp config do
     Application.get_env(:japanese, __MODULE__, [])
   end
