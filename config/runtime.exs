@@ -127,3 +127,8 @@ end
 if config_env() == :dev do
   config :japanese, corpus_dir: System.get_env("CORPUS_DIR", "txt")
 end
+
+timeout = System.get_env("TRANSLATION_TIMEOUT_SECONDS", "20") |> String.to_integer()
+
+config :japanese, Japanese.Translation.Service,
+  timeout: :timer.seconds(timeout)
