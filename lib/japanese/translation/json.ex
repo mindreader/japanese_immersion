@@ -25,7 +25,21 @@ defmodule Japanese.Translation.Json do
           |> Enum.reject(&is_nil/1)
       end)
 
+
     %{"title" => "TODO", "translation" => translation}
-    |> Jason.encode!(pretty: true)
+    |> Jason.encode!(pretty: pretty_json())
+  end
+
+  defp config do
+    Application.get_env(:japanese, __MODULE__, [])
+  end
+
+  defp pretty_json do
+    setting = config()
+    if !is_nil(setting[:pretty_json]) do
+      setting[:pretty_json]
+    else
+      false
+    end
   end
 end
