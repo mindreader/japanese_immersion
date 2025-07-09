@@ -3,6 +3,7 @@ defmodule Japanese.Corpus.Page do
   Struct representing a page in a story.
   - :number   — the page number as an integer
   - :story    — the story name as a string
+  - :translated? — whether the page has been translated (boolean)
   """
 
   require Logger
@@ -10,15 +11,17 @@ defmodule Japanese.Corpus.Page do
 
   @type t :: %__MODULE__{
           number: integer(),
-          story: String.t()
+          story: String.t(),
+          translated?: boolean()
         }
-  defstruct number: nil, story: nil
+  defstruct number: nil, story: nil, translated?: false
 
   @doc """
   Translates the Japanese text for this page to English using the Japanese.Translation module.
   Returns the translation result (not written to file). This could take some time...
   """
   @spec translate_page(t) :: :ok | {:error, term}
+  def translate_page(%__MODULE__{translated?: true}), do: {:error, :already_translated}
   def translate_page(page) do
     with {:ok, japanese_text} <- get_japanese_text(page),
          %Japanese.Translation{text: interleaved_translation} <-

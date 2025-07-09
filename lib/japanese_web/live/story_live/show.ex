@@ -93,6 +93,24 @@ defmodule JapaneseWeb.StoryLive.Show do
     end
   end
 
+  @impl true
+  def handle_event("delete_page", %{"number" => number_str}, socket) do
+    with {number, ""} <- Integer.parse(number_str),
+         {:ok, story} <- Map.fetch(socket.assigns, :story),
+         page = %Japanese.Corpus.Page{number: number, story: story.name},
+         :ok <- Japanese.Corpus.Page.delete(page) do
+      pages = Japanese.Corpus.Story.list_pages(story)
+      {:noreply, assign(socket, :pages, pages)}
+    else
+      :error ->
+        {:noreply, put_flash(socket, :error, "Invalid page number.")}
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Failed to delete page: #{inspect(reason)}")}
+      _ ->
+        {:noreply, put_flash(socket, :error, "Unexpected error deleting page.")}
+    end
+  end
+
   defp page_title(:show), do: "Show Story"
   defp page_title(:edit), do: "Edit Story"
 end
