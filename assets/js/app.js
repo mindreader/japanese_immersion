@@ -42,3 +42,14 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
+// Toggle visibility of all elements with a given class using visibility: hidden
+window.toggleVisibilityByClass = function(className) {
+  document.querySelectorAll('.' + className).forEach(el => {
+    if (el.style.visibility === 'hidden') {
+      el.style.visibility = '';
+    } else {
+      el.style.visibility = 'hidden';
+    }
+  });
+};
+

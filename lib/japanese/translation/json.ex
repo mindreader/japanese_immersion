@@ -42,6 +42,7 @@ defmodule Japanese.Translation.Json do
   # allow us to decode into atoms safely
   defp decode_key(x) do
     case x do
+      "title" -> :title
       "japanese" -> :japanese
       "english" -> :english
       "translation" -> :translation

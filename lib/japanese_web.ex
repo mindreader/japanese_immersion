@@ -89,6 +89,7 @@ defmodule JapaneseWeb do
       import Phoenix.HTML
       # Core UI components
       import JapaneseWeb.CoreComponents
+      import JapaneseWeb.CoreComponents.Page
 
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS

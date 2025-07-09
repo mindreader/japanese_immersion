@@ -30,6 +30,14 @@ defmodule JapaneseWeb.PageLive.Show do
           assign(socket, :japanese_text, nil)
         end
 
+      # Assign translation content
+      translation =
+        case Japanese.Corpus.Page.get_translation(page) do
+          {:ok, content} -> content
+          _ -> nil
+        end
+      socket = assign(socket, :translation, translation)
+
       {:noreply, socket}
     else
       _ ->

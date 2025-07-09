@@ -15,22 +15,21 @@ defmodule Japanese.Corpus.Page do
   defstruct number: nil, story: nil
 
   @doc """
-  Translates the given Japanese text to English using the Japanese.Translation module.
-  Returns the translation result (not written to file).
+  Translates the Japanese text for this page to English using the Japanese.Translation module.
+  Returns the translation result (not written to file). This could take some time...
   """
-  @spec translate_page(t, String.t()) :: :ok | {:error, term}
-  def translate_page(page, japanese_text) do
-    case Japanese.Translation.ja_to_en(japanese_text, interleaved: true) do
-      %Japanese.Translation{text: interleaved_translation} ->
-        json = Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
+  @spec translate_page(t) :: :ok | {:error, term}
+  def translate_page(page) do
+    with {:ok, japanese_text} <- get_japanese_text(page),
+         %Japanese.Translation{text: interleaved_translation} <- Japanese.Translation.ja_to_en(japanese_text, interleaved: true) do
+      json = Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
 
-        StorageLayer.new()
-        |> StorageLayer.write_english_translation(page.story, page.number, json)
+      StorageLayer.new()
+      |> StorageLayer.write_english_translation(page.story, page.number, json)
 
-        :ok
-
-      {:error, reason} ->
-        {:error, reason}
+      :ok
+    else
+      {:error, reason} -> {:error, reason}
     end
   end
 
