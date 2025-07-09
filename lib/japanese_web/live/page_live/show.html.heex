@@ -1,11 +1,15 @@
 <.header>
   Page {@page.number} of story {@story.name}
   <:subtitle>This is a single page view.</:subtitle>
+  <:actions>
+    <.link href={~p"/stories/#{@story.name}/#{@page.number}/japanese"}>
+      <.button>View Original Japanese</.button>
+    </.link>
+  </:actions>
 </.header>
 
-<div class="mt-4">
-  <p>Page number: {@page.number}</p>
-  <%= if @view_mode == :show do %>
+<div class="mt-8">
+  <%= if @live_action == :show do %>
     <!-- TODO: Render translation here -->
     <em>Translation view coming soon.</em>
   <% end %>

@@ -92,6 +92,19 @@ defmodule Japanese.Corpus.Story do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  @doc """
+  Get a specific page by page number from a story struct.
+  Returns {:ok, page} if found, or {:error, :not_found}.
+  """
+  @spec get_page(t(), integer()) :: {:ok, Page.t()} | {:error, :not_found}
+  def get_page(story, page_number) do
+    pages = list_pages(story)
+    case Enum.find(pages, &(&1.number == page_number)) do
+      nil -> {:error, :not_found}
+      page -> {:ok, page}
+    end
+  end
 end
 
 defimpl Phoenix.Param, for: Japanese.Corpus.Story do
