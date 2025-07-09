@@ -1,5 +1,4 @@
 defmodule Japanese.Translation.Service do
-
   @doc """
   Asynchronously translates a page. If you want to know when the translation is finished,
   you can subscribe to the `:translation_finished` event.
@@ -19,7 +18,7 @@ defmodule Japanese.Translation.Service do
       GenServer.start_link(__MODULE__, nil, opts)
     end
 
-   @impl GenServer
+    @impl GenServer
     def init(init_arg) do
       {:ok, init_arg}
     end
@@ -34,8 +33,11 @@ defmodule Japanese.Translation.Service do
         case Japanese.Translation.translate_page(page) do
           :ok ->
             Logger.info("Finished translating story #{page.story} page #{page.number}")
+
           {:error, reason} ->
-            Logger.error("Error translating story #{page.story} page #{page.number}: #{inspect(reason)} after #{timeout}ms")
+            Logger.error(
+              "Error translating story #{page.story} page #{page.number}: #{inspect(reason)} after #{timeout}ms"
+            )
         end
       end)
       |> Task.await(timeout)
@@ -49,27 +51,25 @@ defmodule Japanese.Translation.Service do
     end
   end
 
-    def config do
-      Application.get_env(:japanese, __MODULE__, [])
+  def config do
+    Application.get_env(:japanese, __MODULE__, [])
+  end
+
+  def timeout_ms do
+    config = config()
+
+    case config[:timeout_ms] do
+      nil -> 120 |> :timer.seconds()
+      other -> other
     end
+  end
 
-    def timeout_ms do
-      config = config()
+  def task_supervisor do
+    config = config()
 
-      case config[:timeout_ms] do
-        nil -> 120 |> :timer.seconds()
-        other -> other
-      end
+    case config[:task_supervisor] do
+      nil -> Japanese.Task.Supervisor
+      other -> other
     end
-
-    def task_supervisor do
-      config = config()
-
-      case config[:task_supervisor] do
-        nil -> Japanese.Task.Supervisor
-        other -> other
-      end
-    end
-
-
+  end
 end

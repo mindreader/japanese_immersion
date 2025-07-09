@@ -130,5 +130,4 @@ end
 
 timeout = System.get_env("TRANSLATION_TIMEOUT_SECONDS", "20") |> String.to_integer()
 
-config :japanese, Japanese.Translation.Service,
-  timeout: :timer.seconds(timeout)
+config :japanese, Japanese.Translation.Service, timeout: :timer.seconds(timeout)

@@ -5,7 +5,7 @@ defmodule Japanese.Application do
 
   use Application
 
-  @impl true
+  @impl Application
   def start(_type, _args) do
     children = [
       JapaneseWeb.Telemetry,
@@ -29,7 +29,7 @@ defmodule Japanese.Application do
 
   # Tell Phoenix to update the endpoint configuration
   # whenever the application is updated.
-  @impl true
+  @impl Application
   def config_change(changed, _new, removed) do
     JapaneseWeb.Endpoint.config_change(changed, removed)
     :ok

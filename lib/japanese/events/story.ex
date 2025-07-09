@@ -10,6 +10,7 @@ defmodule Japanese.Events.Story do
       "story:#{story}",
       {:pages_updated, %{story: story}}
     )
+
     :ok
   end
 end

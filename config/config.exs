@@ -65,5 +65,4 @@ config :phoenix, :json_library, Jason
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
 
-config :japanese, Japanese.Translation.Service,
-  task_supervisor: Japanese.Task.Supervisor
+config :japanese, Japanese.Translation.Service, task_supervisor: Japanese.Task.Supervisor

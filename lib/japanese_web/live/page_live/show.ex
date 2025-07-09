@@ -2,20 +2,17 @@ defmodule JapaneseWeb.PageLive.Show do
   require Logger
   use JapaneseWeb, :live_view
 
-  @impl true
+  @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
     {:ok, assign(socket, show_translation: false)}
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   @spec handle_params(map(), any(), any()) :: {:noreply, map()}
   def handle_params(%{"name" => name, "page" => page_param}, _uri, socket) do
     with {page_number, ""} <- Integer.parse(page_param),
          {:ok, story} <- Japanese.Corpus.Story.get_by_name(name),
          {:ok, page} <- Japanese.Corpus.Story.get_page(story, page_number) do
-
-
-
       if connected?(socket) do
         old_page = socket.assigns[:page]
         manage_pubsub_subscription(old_page, page)
@@ -57,7 +54,7 @@ defmodule JapaneseWeb.PageLive.Show do
     :ok
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info({:translation_finished, %{story: story, page: page_number}}, socket) do
     # Refetch story and page, then update assigns
     with {:ok, story} <- Japanese.Corpus.Story.get_by_name(story),

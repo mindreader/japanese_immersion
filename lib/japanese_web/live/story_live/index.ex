@@ -4,7 +4,7 @@ defmodule JapaneseWeb.StoryLive.Index do
   alias Japanese.Corpus
   alias Japanese.Corpus.Story
 
-  @impl true
+  @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
     socket =
       socket
@@ -15,7 +15,7 @@ defmodule JapaneseWeb.StoryLive.Index do
     {:ok, stream(socket, :stories, Corpus.list_stories())}
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_params(params, _url, socket) do
     {:noreply, apply_action(socket, socket.assigns.live_action, params)}
   end
@@ -38,12 +38,12 @@ defmodule JapaneseWeb.StoryLive.Index do
     |> assign(:story, nil)
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_info({JapaneseWeb.StoryLive.FormComponent, {:saved, story}}, socket) do
     {:noreply, stream_insert(socket, :stories, story)}
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("delete", %{"id" => name}, socket) do
     story = %Story{name: name}
     :ok = Story.delete(story)

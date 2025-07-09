@@ -3,12 +3,12 @@ defmodule JapaneseWeb.StoryLive.Show do
 
   alias Japanese.Corpus.Story
 
-  @impl true
+  @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
     {:ok, assign(socket, new_page_text: nil, new_page_error: nil)}
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_params(%{"name" => name}, _, socket) do
     case Story.get_by_name(name) do
       {:ok, story} ->
@@ -32,10 +32,11 @@ defmodule JapaneseWeb.StoryLive.Show do
     end
   end
 
- @impl true
+  @impl Phoenix.LiveView
   def handle_event("edit_page", %{"number" => number}, socket) do
     with {page_number, ""} <- Integer.parse(number),
-         page_struct when not is_nil(page_struct) <- Enum.find(socket.assigns.pages, &(&1.number == page_number)),
+         page_struct when not is_nil(page_struct) <-
+           Enum.find(socket.assigns.pages, &(&1.number == page_number)),
          {:ok, japanese_text} <- Japanese.Corpus.Page.get_japanese_text(page_struct) do
       {:noreply,
        socket
@@ -48,7 +49,7 @@ defmodule JapaneseWeb.StoryLive.Show do
     end
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("add_page", _params, socket) do
     {:noreply,
      socket
@@ -57,7 +58,7 @@ defmodule JapaneseWeb.StoryLive.Show do
      |> assign(:new_page_error, nil)}
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("create_page", %{"japanese_text" => text}, socket) do
     text = String.trim(text || "")
 
@@ -85,7 +86,7 @@ defmodule JapaneseWeb.StoryLive.Show do
     end
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("delete_page", %{"number" => number_str}, socket) do
     with {number, ""} <- Integer.parse(number_str),
          {:ok, story} <- Map.fetch(socket.assigns, :story),
@@ -96,23 +97,27 @@ defmodule JapaneseWeb.StoryLive.Show do
     else
       :error ->
         {:noreply, put_flash(socket, :error, "Invalid page number.")}
+
       {:error, reason} ->
         {:noreply, put_flash(socket, :error, "Failed to delete page: #{inspect(reason)}")}
+
       _ ->
         {:noreply, put_flash(socket, :error, "Unexpected error deleting page.")}
     end
   end
 
-  @impl true
+  @impl Phoenix.LiveView
   def handle_event("update_page", %{"japanese_text" => text}, socket) do
     text = String.trim(text || "")
     page = socket.assigns.edit_page
+
     if is_nil(page) or text == "" do
       {:noreply, assign(socket, edit_page_error: "Text can't be blank")}
     else
       case Japanese.Corpus.Page.update_japanese_text(page, text) do
         :ok ->
           pages = Story.list_pages(socket.assigns.story)
+
           {:noreply,
            socket
            |> assign(:pages, pages)
@@ -121,6 +126,7 @@ defmodule JapaneseWeb.StoryLive.Show do
            |> assign(:edit_page_text, nil)
            |> assign(:edit_page_error, nil)
            |> push_patch(to: ~p"/stories/#{socket.assigns.story.name}")}
+
         {:error, reason} ->
           {:noreply, assign(socket, edit_page_error: inspect(reason))}
       end

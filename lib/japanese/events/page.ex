@@ -14,12 +14,13 @@ defmodule Japanese.Events.Page do
   @spec translation_finished(Japanese.Corpus.Page.t()) :: :ok
   def translation_finished(%Japanese.Corpus.Page{story: story, number: page}) do
     IO.puts("emitting translation finished for #{story} #{page}")
+
     Phoenix.PubSub.broadcast(
       Japanese.PubSub,
       "story:#{story}:page:#{page}",
       {:translation_finished, %{story: story, page: page}}
     )
+
     :ok
   end
-
 end

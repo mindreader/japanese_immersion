@@ -3,7 +3,7 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
 
   alias Japanese.Corpus.Story
 
-  @impl true
+  @impl Phoenix.LiveComponent
   def render(assigns) do
     ~H"""
     <div>
@@ -28,14 +28,14 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
     """
   end
 
-  @impl true
+  @impl Phoenix.LiveComponent
   def update(%{story: story} = assigns, socket) do
     pages = if story.name, do: Story.list_pages(story), else: []
     form = Phoenix.Component.to_form(%{"name" => story.name || ""})
     {:ok, socket |> assign(assigns) |> assign(:form, form) |> assign(:pages, pages)}
   end
 
-  @impl true
+  @impl Phoenix.LiveComponent
   def handle_event("validate", %{"story" => story_params}, socket) do
     errors =
       if String.trim(story_params["name"] || "") == "",

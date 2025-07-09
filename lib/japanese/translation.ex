@@ -88,6 +88,7 @@ defmodule Japanese.Translation do
   """
   @spec translate_page(Japanese.Corpus.Page.t()) :: :ok | {:error, term}
   def translate_page(%Japanese.Corpus.Page{translated?: true}), do: {:error, :already_translated}
+
   def translate_page(page) do
     alias Japanese.Corpus.Story
     alias Japanese.Corpus.Page
@@ -178,6 +179,7 @@ defmodule Japanese.Translation do
     |> case do
       {:ok, anthropix_result} ->
         Response.parse_response(anthropix_result)
+
       {:error, %Req.TransportError{reason: :closed}} = error ->
         if retry > 0 do
           call_anthropix(system_prompt, user_text, Keyword.put(opts, :retries, retry - 1))
