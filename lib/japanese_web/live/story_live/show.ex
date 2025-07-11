@@ -164,6 +164,18 @@ defmodule JapaneseWeb.StoryLive.Show do
     end
   end
 
+  @impl Phoenix.LiveView
+  def handle_info({JapaneseWeb.StoryLive.FormComponent, {:saved, story}}, socket) do
+    pages = Story.list_pages(story)
+    {:noreply,
+     socket
+     |> assign(:story, story)
+     |> assign(:pages, pages)
+     |> put_flash(:info, "Story renamed successfully")
+     |> push_patch(to: ~p"/stories/#{story.name}")}
+  end
+
   defp page_title(:show), do: "Show Story"
   defp page_title(:edit), do: "Edit Story"
+  defp page_title(:add), do: "Add Page"
 end

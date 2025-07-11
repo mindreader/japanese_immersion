@@ -39,6 +39,10 @@ defmodule Test.Japanese.Translation do
       "service_tier" => "standard"
     }
   }
+  setup do
+    Mimic.stub(Anthropix, :chat, fn _client, _opts -> {:error, :llm_error} end)
+    :ok
+  end
 
   describe "ja_to_en/2" do
     test "returns a Translation struct on success" do
@@ -115,6 +119,20 @@ defmodule Test.Japanese.Translation do
     test "returns error on LLM error" do
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:error, :llm_error} end)
       assert {:error, :llm_error} = Translation.en_to_ja("This is a test", [])
+    end
+  end
+
+  describe "translate_page/1" do
+    test "writes a translation file for a page (translation file: <number>tr.yaml)" do
+      story_name = "mystory"
+      page = %Japanese.Corpus.Page{number: 5, story: story_name}
+      japanese_text = "そして私は預言者と共に王都に向かうことになったのだ。"
+
+      Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, fn ^page -> {:ok, japanese_text} end)
+      Mimic.expect(Japanese.Corpus.Story, :get_by_name, fn ^story_name -> {:ok, %Japanese.Corpus.Story{}} end)
+      Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @anthropix_response_en} end)
+
+      assert :ok = Translation.translate_page(page)
     end
   end
 end

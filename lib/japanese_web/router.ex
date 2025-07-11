@@ -23,6 +23,7 @@ defmodule JapaneseWeb.Router do
     live "/stories/new", StoryLive.Index, :new
 
     live "/stories/:name", StoryLive.Show, :show
+    live "/stories/:name/add", StoryLive.Show, :add
     live "/stories/:name/edit", StoryLive.Show, :edit
     live "/stories/:name/:page", PageLive.Show, :show
     get "/stories/:name/:page/japanese", PageController, :japanese

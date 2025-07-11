@@ -42,8 +42,8 @@ defmodule Test.Japanese.Corpus do
       story = %Story{name: "mystory"}
 
       fake_pairs = [
-        %{number: 1},
-        %{number: 2}
+        %{number: 1, translation: nil},
+        %{number: 2, translation: nil}
       ]
 
       expect(StorageLayer, :pair_files, 1, fn ^storage, "mystory" -> {:ok, fake_pairs} end)
@@ -51,8 +51,8 @@ defmodule Test.Japanese.Corpus do
       pages = Story.list_pages(story)
 
       assert [
-               %Page{number: 1, story: "mystory"},
-               %Page{number: 2, story: "mystory"}
+               %Page{number: 2, story: "mystory", translated?: false},
+               %Page{number: 1, story: "mystory", translated?: false}
              ] = pages
     end
   end
@@ -83,42 +83,6 @@ defmodule Test.Japanese.Corpus do
     test "returns error if creation fails", %{storage: storage} do
       expect(StorageLayer, :create_story, 1, fn ^storage, "failstory" -> {:error, :eacces} end)
       assert {:error, :eacces} = Story.create("failstory")
-    end
-  end
-
-  describe "Page.write_english_translation/2" do
-    setup :verify_on_exit!
-
-    test "writes a translation file for a page (translation file: <number>tr.yaml)", %{
-      storage: storage
-    } do
-      page = %Page{number: 5, story: "mystory"}
-
-      japanese_text = "そして私は預言者と共に王都に向かうことになったのだ。"
-
-      interleaved_translation = """
-      そして私は預言者と共に王都に向かうことになったのだ。
-
-      And so I came to head to the royal capital together with the prophet.
-
-      !CONTINUED!
-      """
-
-      expected_json =
-        Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
-
-      stub(Japanese.Translation, :ja_to_en, fn ^japanese_text, interleaved: true ->
-        %Japanese.Translation{text: interleaved_translation}
-      end)
-
-      expect(StorageLayer, :write_english_translation, 1, fn ^storage,
-                                                             "mystory",
-                                                             5,
-                                                             ^expected_json ->
-        {:ok, :written}
-      end)
-
-      assert :ok = Page.translate_page(page, japanese_text)
     end
   end
 

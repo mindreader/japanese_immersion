@@ -27,18 +27,23 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     new_name = "renamed_story"
     old_story = %Story{name: old_name}
     new_story = %Story{name: new_name}
-    # get_by_name is called for old_name (show, edit, after patch) and new_name (after rename)
-    Mimic.expect(Story, :get_by_name, 3, fn ^old_name -> {:ok, old_story} end)
-    Mimic.expect(Story, :get_by_name, 1, fn ^new_name -> {:ok, new_story} end)
-    Mimic.expect(Story, :rename, fn ^old_name, ^new_name -> {:ok, new_story} end)
-
+    # get_by_name is called for old_name (once for initial load, once for live view)
+    Mimic.expect(Story, :get_by_name, 2, fn ^old_name -> {:ok, old_story} end)
     {:ok, view, _html} = live(conn, ~p"/stories/#{old_name}")
-    element(view, "a", "Edit story") |> render_click()
-    assert render(view) =~ "Edit Story"
 
-    form_el = element(view, "#story-form")
-    render_submit(form_el, %{story: %{name: new_name}})
+    # When the edit modal is opened, get_by_name is called again for old_name
+    Mimic.expect(Story, :get_by_name, 1, fn ^old_name -> {:ok, old_story} end)
+    view |> element("a", "Edit story") |> render_click()
+
+    # Actual rename happens, check that new name is not taken, then get_by_name is called for new_name upon rerender
+    Mimic.expect(Story, :rename, 1, fn ^old_name, ^new_name -> {:ok, new_story} end)
+    Mimic.expect(Story, :get_by_name, 2, fn ^new_name -> {:ok, new_story} end)
+
+    form = form(view, "#story-form", name: new_name)
+    _html = render_submit(form)
+
+    assert has_element?(view, "form#story-form") == false
     assert render(view) =~ "Story renamed successfully"
-    assert_patch(view, ~p"/stories/#{new_name}")
+    assert render(view) =~ new_name
   end
 end

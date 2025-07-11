@@ -1,7 +1,9 @@
 <.header>
   Story {@story.name}
   <:actions>
-    <.button phx-click="add_page" class="ml-2">Add Page</.button>
+    <.link navigate={~p"/stories/#{@story}/add"} phx-click={JS.push_focus()}>
+      <.button>Add Page</.button>
+     </.link>
     <.link patch={~p"/stories/#{@story}/edit"} phx-click={JS.push_focus()}>
       <.button>Edit story</.button>
     </.link>
@@ -65,7 +67,7 @@
 </.modal>
 
 <.modal
-  :if={@new_page_modal}
+  :if={@live_action == :add}
   id="new-page-modal"
   show
   on_cancel={JS.patch(~p"/stories/#{@story}")}

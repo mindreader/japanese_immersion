@@ -136,6 +136,8 @@ defmodule Japanese.Translation do
     interleaved_part =
       if interleaved do
         " " <> File.read!("priv/translation/interleave.txt")
+      else
+        ""
       end
 
     extras_part =
