@@ -8,7 +8,7 @@ defmodule JapaneseWeb.PageController do
 
   def japanese(conn, %{"name" => name, "page" => page_num}) do
     with {:ok, story} <- Story.get_by_name(name),
-         {page_number, ""} <- Integer.parse(page_num),
+         {:page_number, {page_number, ""}} <- {:page_number, Integer.parse(page_num)},
          {:ok, page} <- Story.get_page(story, page_number),
          {:ok, text} <- Page.get_japanese_text(page) do
       render(conn, :japanese, text: text, page: page, story: name)
@@ -16,7 +16,7 @@ defmodule JapaneseWeb.PageController do
       {:error, :not_found} ->
         send_resp(conn, 404, "Story or page not found.")
 
-      :error ->
+      {:page_number, :error} ->
         send_resp(conn, 404, "Invalid page number.")
 
       {:error, _} ->
