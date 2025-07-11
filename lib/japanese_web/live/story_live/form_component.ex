@@ -9,7 +9,6 @@ defmodule JapaneseWeb.StoryLive.FormComponent do
     <div>
       <.header>
         {@title}
-        <:subtitle>Use this form to manage story records in your corpus.</:subtitle>
       </.header>
 
       <.simple_form
