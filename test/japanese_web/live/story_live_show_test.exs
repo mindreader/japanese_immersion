@@ -133,4 +133,31 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
     assert render(view) =~ "#edit-page-modal"
   end
+
+  test "shows validation errors when editing a page", %{conn: conn} do
+    story_name = "test_story"
+    story = %Story{name: story_name}
+    page = %Japanese.Corpus.Page{number: 1, story: story_name, translated?: false}
+    old_text = "old text"
+    # Initial load: story exists, has one page
+    Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
+    Mimic.expect(Story, :list_pages, 2, fn ^story -> [page] end)
+    {:ok, view, _html} = live(conn, ~p"/stories/#{story}")
+
+    # Open edit modal
+    Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, 1, fn ^page -> {:ok, old_text} end)
+    view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
+    assert render(view) =~ old_text
+
+    # Submit blank text (no new expectations needed)
+    form = form(view, "#edit-page-modal form", japanese_text: "   ")
+    render_submit(form)
+    assert render(view) =~ "Text can&#39;t be blank"
+
+    # Submit valid text but backend returns error
+    Mimic.expect(Japanese.Corpus.Page, :update_japanese_text, 1, fn ^page, "valid text" -> {:error, "disk full"} end)
+    form = form(view, "#edit-page-modal form", japanese_text: "valid text")
+    render_submit(form)
+    assert render(view) =~ "disk full"
+  end
 end
