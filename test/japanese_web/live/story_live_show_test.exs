@@ -98,4 +98,39 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     assert render(view) =~ "Pages"
     refute render(view) =~ "Page #1"
   end
+
+  test "shows edit story modal when Edit story is clicked", %{conn: conn} do
+    story_name = "test_story"
+    story = %Story{name: story_name}
+    Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
+    {:ok, view, _html} = live(conn, ~p"/stories/#{story}")
+    Mimic.expect(Story, :get_by_name, 1, fn ^story_name -> {:ok, story} end)
+    view |> element("a", "Edit story") |> render_click()
+    assert render(view) =~ "#story-modal"
+  end
+
+  test "shows add page modal when Add Page is clicked", %{conn: conn} do
+    story_name = "test_story"
+    story = %Story{name: story_name}
+    Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
+    {:ok, view, _html} = live(conn, ~p"/stories/#{story}")
+
+    Mimic.expect(Story, :get_by_name, 1, fn ^story_name -> {:ok, story} end)
+    # Simulate navigation to the add page route
+    render_patch(view, ~p"/stories/#{story}/add")
+    assert render(view) =~ "#new-page-modal"
+  end
+
+  test "shows edit page modal when Edit is clicked for a page", %{conn: conn} do
+    story_name = "test_story"
+    story = %Story{name: story_name}
+    page = %Japanese.Corpus.Page{number: 1, story: story_name, translated?: false}
+    old_text = "old text"
+    Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
+    Mimic.expect(Story, :list_pages, 2, fn ^story -> [page] end)
+    {:ok, view, _html} = live(conn, ~p"/stories/#{story}")
+    Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, 1, fn ^page -> {:ok, old_text} end)
+    view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
+    assert render(view) =~ "#edit-page-modal"
+  end
 end
