@@ -46,4 +46,56 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     assert render(view) =~ "Story renamed successfully"
     assert render(view) =~ new_name
   end
+
+  test "can edit a page", %{conn: conn} do
+    story_name = "test_story"
+    story = %Story{name: story_name}
+    page = %Japanese.Corpus.Page{number: 1, story: story_name, translated?: false}
+    old_text = "old text"
+    new_text = "new text"
+    # Initial load: story exists, has one page, static render then live view render
+    Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
+    Mimic.expect(Story, :list_pages, 2, fn ^story -> [page] end)
+    {:ok, view, html} = live(conn, ~p"/stories/#{story}")
+    assert html =~ "Page #1"
+
+    # Mock get_japanese_text for edit modal
+    Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, 1, fn ^page -> {:ok, old_text} end)
+    # Open edit modal
+    Mimic.expect(Story, :get_by_name, 1, fn ^story_name -> {:ok, story} end)
+    Mimic.expect(Story, :list_pages, 1, fn ^story -> [page] end)
+
+    view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
+    assert render(view) =~ old_text
+
+    # Mock update and translation
+    Mimic.expect(Japanese.Corpus.Page, :update_japanese_text, 1, fn ^page, ^new_text -> :ok end)
+    Mimic.expect(Japanese.Translation.Service, :translate_page, 1, fn ^page -> :ok end)
+
+    # After update, list_pages returns updated page
+    updated_page = %Japanese.Corpus.Page{page | translated?: false}
+    Mimic.expect(Story, :list_pages, 1, fn ^story -> [updated_page] end)
+
+    form = form(view, "#edit-page-modal form", japanese_text: new_text)
+    render_submit(form)
+    # After submit, the edit modal should be closed
+    refute render(view) =~ "#edit-page-modal"
+  end
+
+  test "can delete a page", %{conn: conn} do
+    story_name = "test_story"
+    story = %Story{name: story_name}
+    page = %Japanese.Corpus.Page{number: 1, story: story_name, translated?: false}
+    # Initial load: story exists, has one page
+    Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
+    Mimic.expect(Story, :list_pages, 2, fn ^story -> [page] end)
+    {:ok, view, html} = live(conn, ~p"/stories/#{story}")
+    assert html =~ "Page #1"
+    # Mock delete and list_pages after deletion
+    Mimic.expect(Japanese.Corpus.Page, :delete, 1, fn ^page -> :ok end)
+    Mimic.expect(Story, :list_pages, 1, fn ^story -> [] end)
+    view |> element("button", "Delete") |> render_click(%{"number" => "1"})
+    assert render(view) =~ "Pages"
+    refute render(view) =~ "Page #1"
+  end
 end
