@@ -13,13 +13,14 @@
     pname = "japanese-immersion";
     version = "0.1.0";
     src = ./.;
+    removeCookie = false;
 
     mixNixDeps = import ./deps.nix {
       inherit beamPackages lib pkgs;
     };
 
     japanese-immersion-release = pkgs.beamPackages.mixRelease {
-      inherit pname version src mixNixDeps;
+      inherit pname version src mixNixDeps removeCookie;
 
       postBuild = ''
 
