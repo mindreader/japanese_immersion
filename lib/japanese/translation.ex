@@ -135,7 +135,7 @@ defmodule Japanese.Translation do
     # TODO there is no need to have newlines between each original line and its single translation.
     interleaved_part =
       if interleaved do
-        " " <> File.read!("priv/translation/interleave.txt")
+        " " <> File.read!(Application.app_dir(:japanese, "priv/translation/interleave.txt"))
       else
         ""
       end

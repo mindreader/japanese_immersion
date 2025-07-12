@@ -68,8 +68,18 @@ if config_env() == :prod do
     secret_key_base: secret_key_base
 end
 
-if config_env() != :test do
+if config_env() == :prod do
   config :japanese, anthropic_api_key: System.fetch_env!("ANTHROPIC_API_KEY")
+end
+
+if config_env() == :dev do
+  key = System.get_env("ANTHROPIC_API_KEY")
+
+  if !key do
+    IO.puts("Warning: ANTHROPIC_API_KEY is not set. Calls to the Anthropic API will fail.")
+  end
+
+  config :japanese, anthropic_api_key: key
 end
 
 if config_env() == :prod do
