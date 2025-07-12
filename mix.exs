@@ -65,7 +65,8 @@ defmodule Japanese.MixProject do
       {:mimic, github: "mindreader/mimic", only: :test},
       {:ex_machina, "~> 2.8.0", only: :test},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
-      {:phoenix_pubsub, "~> 2.1"}
+      {:phoenix_pubsub, "~> 2.1"},
+      {:deps_nix, "~> 2.3.0", only: :dev}
     ]
   end
 
@@ -87,7 +88,9 @@ defmodule Japanese.MixProject do
         "tailwind japanese --minify",
         "esbuild japanese --minify",
         "phx.digest"
-      ]
+      ],
+      "deps.get": ["deps.get", "deps.nix"],
+      "deps.update": ["deps.update", "deps.nix"]
     ]
   end
 end
