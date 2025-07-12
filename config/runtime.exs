@@ -65,7 +65,9 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    # we are accessing this often by ip.
+    check_origin: false,
 end
 
 if config_env() == :prod do
