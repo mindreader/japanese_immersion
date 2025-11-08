@@ -161,7 +161,7 @@ defmodule Japanese.Translation do
       raise "ANTHROPIC_API_KEY is not set in config or environment"
     end
 
-    Anthropix.init(api_key)
+    Anthropix.init(api_key, receive_timeout: 240_000)
   end
 
   defp call_anthropix(system_prompt, user_text, opts \\ []) do
