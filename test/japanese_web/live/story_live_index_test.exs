@@ -13,6 +13,7 @@ defmodule JapaneseWeb.StoryLive.IndexTest do
       %Story{name: "story1"},
       %Story{name: "story2"}
     ]
+
     Mimic.stub(Corpus, :list_stories, fn -> stories end)
     {:ok, _view, html} = live(conn, ~p"/stories")
     assert html =~ "Listing Stories"
@@ -29,7 +30,10 @@ defmodule JapaneseWeb.StoryLive.IndexTest do
     {:ok, view, html} = live(conn, ~p"/stories")
     assert html =~ "story1"
     # Simulate clicking the Delete link for story1
-    view |> element(~s{a[data-confirm][phx-click][href="#"]:fl-contains('Delete')}) |> render_click(%{"id" => "story1"})
+    view
+    |> element(~s{a[data-confirm][phx-click][href="#"]:fl-contains('Delete')})
+    |> render_click(%{"id" => "story1"})
+
     refute render(view) =~ "story1"
   end
 

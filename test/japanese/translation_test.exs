@@ -129,7 +129,11 @@ defmodule Test.Japanese.Translation do
       japanese_text = "そして私は預言者と共に王都に向かうことになったのだ。"
 
       Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, fn ^page -> {:ok, japanese_text} end)
-      Mimic.expect(Japanese.Corpus.Story, :get_by_name, fn ^story_name -> {:ok, %Japanese.Corpus.Story{}} end)
+
+      Mimic.expect(Japanese.Corpus.Story, :get_by_name, fn ^story_name ->
+        {:ok, %Japanese.Corpus.Story{}}
+      end)
+
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @anthropix_response_en} end)
 
       assert :ok = Translation.translate_page(page)

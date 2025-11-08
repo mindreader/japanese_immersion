@@ -13,7 +13,11 @@ defmodule JapaneseWeb.PageControllerTest do
     japanese_text = "これは日本語のテキストです。"
 
     Mimic.expect(Story, :get_by_name, 1, fn ^story_name -> {:ok, %Story{name: story_name}} end)
-    Mimic.expect(Story, :get_page, 1, fn %Story{name: ^story_name}, ^page_number -> {:ok, page} end)
+
+    Mimic.expect(Story, :get_page, 1, fn %Story{name: ^story_name}, ^page_number ->
+      {:ok, page}
+    end)
+
     Mimic.expect(Page, :get_japanese_text, 1, fn ^page -> {:ok, japanese_text} end)
 
     conn = get(conn, "/stories/#{story_name}/#{page_number}/japanese")
@@ -25,7 +29,9 @@ defmodule JapaneseWeb.PageControllerTest do
     page_number = 1
 
     # Simulate story not found
-    Mimic.expect(Japanese.Corpus.Story, :get_by_name, 1, fn ^story_name -> {:error, :not_found} end)
+    Mimic.expect(Japanese.Corpus.Story, :get_by_name, 1, fn ^story_name ->
+      {:error, :not_found}
+    end)
 
     conn = get(conn, "/stories/#{story_name}/#{page_number}/japanese")
     assert response(conn, 404) =~ "Story or page not found."
@@ -36,7 +42,9 @@ defmodule JapaneseWeb.PageControllerTest do
     invalid_page = "notanumber"
 
     # get_by_name should succeed, but page number is invalid
-    Mimic.expect(Japanese.Corpus.Story, :get_by_name, 1, fn ^story_name -> {:ok, %Story{name: story_name}} end)
+    Mimic.expect(Japanese.Corpus.Story, :get_by_name, 1, fn ^story_name ->
+      {:ok, %Story{name: story_name}}
+    end)
 
     conn = get(conn, "/stories/#{story_name}/#{invalid_page}/japanese")
     assert response(conn, 404) =~ "Invalid page number."

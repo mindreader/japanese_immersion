@@ -155,7 +155,10 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     assert render(view) =~ "Text can&#39;t be blank"
 
     # Submit valid text but backend returns error
-    Mimic.expect(Japanese.Corpus.Page, :update_japanese_text, 1, fn ^page, "valid text" -> {:error, "disk full"} end)
+    Mimic.expect(Japanese.Corpus.Page, :update_japanese_text, 1, fn ^page, "valid text" ->
+      {:error, "disk full"}
+    end)
+
     form = form(view, "#edit-page-modal form", japanese_text: "valid text")
     render_submit(form)
     assert render(view) =~ "disk full"

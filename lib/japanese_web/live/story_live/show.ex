@@ -167,6 +167,7 @@ defmodule JapaneseWeb.StoryLive.Show do
   @impl Phoenix.LiveView
   def handle_info({JapaneseWeb.StoryLive.FormComponent, {:saved, story}}, socket) do
     pages = Story.list_pages(story)
+
     {:noreply,
      socket
      |> assign(:story, story)
