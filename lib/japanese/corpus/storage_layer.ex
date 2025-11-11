@@ -25,7 +25,8 @@ defmodule Japanese.Corpus.StorageLayer do
     config =
       Application.get_env(:japanese, __MODULE__, [])
 
-    working_directory = config[:corpus_dir] || raise "CORPUS_DIR is not set in config or environment"
+    working_directory =
+      config[:corpus_dir] || raise "CORPUS_DIR is not set in config or environment"
 
     %__MODULE__{working_directory: working_directory}
   end

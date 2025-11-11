@@ -346,7 +346,7 @@ defmodule Japanese.Hume do
 
   defp build_timeout_opts(opts) do
     connect_timeout = Keyword.get(opts, :connect_timeout, 20000)
-    receive_timeout = Keyword.get(opts, :receive_timeout, 240000)
+    receive_timeout = Keyword.get(opts, :receive_timeout, 240_000)
 
     [connect_timeout: connect_timeout, receive_timeout: receive_timeout]
   end
