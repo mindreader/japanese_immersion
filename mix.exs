@@ -23,6 +23,12 @@ defmodule Japanese.MixProject do
     ]
   end
 
+  def cli do
+    [
+      preferred_envs: [precommit: :test]
+    ]
+  end
+
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
@@ -51,7 +57,6 @@ defmodule Japanese.MixProject do
        compile: false,
        depth: 1},
       {:swoosh, "~> 1.5"},
-      {:finch, "~> 0.13"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.0"},
       {:gettext, "~> 0.26"},
@@ -66,7 +71,10 @@ defmodule Japanese.MixProject do
       {:ex_machina, "~> 2.8.0", only: :test},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
       {:phoenix_pubsub, "~> 2.1"},
-      {:deps_nix, "~> 2.3.0", only: :dev}
+      {:deps_nix, "~> 2.3.0", only: :dev},
+      {:tesla, "~> 1.15"},
+      {:finch, "~> 0.20.0"},
+      {:briefly, "~> 0.5.1"}
     ]
   end
 
@@ -82,6 +90,7 @@ defmodule Japanese.MixProject do
       "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       # test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
+      test: ["test --max-failures=5"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["tailwind japanese", "esbuild japanese"],
       "assets.deploy": [
@@ -90,7 +99,13 @@ defmodule Japanese.MixProject do
         "phx.digest"
       ],
       "deps.get": ["deps.get", "deps.nix"],
-      "deps.update": ["deps.update", "deps.nix"]
+      "deps.update": ["deps.update", "deps.nix"],
+      precommit: [
+        "compile --warning-as-errors",
+        "deps.unlock --unused",
+        "format",
+        "test"
+      ]
     ]
   end
 end

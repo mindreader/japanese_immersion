@@ -188,6 +188,23 @@ let
         in
         drv;
 
+      briefly =
+        let
+          version = "0.5.1";
+          drv = buildMix {
+            inherit version;
+            name = "briefly";
+            appConfigPath = ./config;
+
+            src = fetchHex {
+              inherit version;
+              pkg = "briefly";
+              sha256 = "bd684aa92ad8b7b4e0d92c31200993c4bc1469fc68cd6d5f15144041bd15cb57";
+            };
+          };
+        in
+        drv;
+
       castore =
         let
           version = "1.0.14";
@@ -852,6 +869,32 @@ let
             };
 
             beamDeps = [
+              telemetry
+            ];
+          };
+        in
+        drv;
+
+      tesla =
+        let
+          version = "1.15.3";
+          drv = buildMix {
+            inherit version;
+            name = "tesla";
+            appConfigPath = ./config;
+
+            src = fetchHex {
+              inherit version;
+              pkg = "tesla";
+              sha256 = "98bb3d4558abc67b92fb7be4cd31bb57ca8d80792de26870d362974b58caeda7";
+            };
+
+            beamDeps = [
+              castore
+              finch
+              jason
+              mime
+              mint
               telemetry
             ];
           };
