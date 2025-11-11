@@ -7,7 +7,7 @@ defmodule Japanese.Translation do
     - :usage (the usage struct)
   """
 
-  @model "claude-sonnet-4-20250514"
+  @model "claude-sonnet-4-5-20250929"
 
   @type ja_to_en_opts :: [
           literalness: :literal | :natural,

@@ -26,7 +26,8 @@ config :japanese, Japanese.Hume,
 
 config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
 
-config :japanese, Japanese.Corpus.StorageLayer, corpus_dir: System.get_env("CORPUS_DIR")
+corpus_dir = System.get_env("CORPUS_DIR", if config_env() == :dev do "txt" end)
+config :japanese, Japanese.Corpus.StorageLayer, corpus_dir: corpus_dir
 
 if config_env() == :prod do
   # Not using a database for now, but perhaps in the future
