@@ -155,7 +155,7 @@ defmodule Japanese.Translation do
   end
 
   defp build_client do
-    api_key = Application.fetch_env!(:japanese, :anthropic_api_key)
+    api_key = Application.fetch_env!(:japanese, __MODULE__)[:api_key]
 
     if is_nil(api_key) do
       raise "ANTHROPIC_API_KEY is not set in config or environment"

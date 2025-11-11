@@ -346,7 +346,7 @@ defmodule Japanese.Hume do
 
   defp build_timeout_opts(opts) do
     connect_timeout = Keyword.get(opts, :connect_timeout, 20000)
-    receive_timeout = Keyword.get(opts, :receive_timeout, 60000)
+    receive_timeout = Keyword.get(opts, :receive_timeout, 240000)
 
     [connect_timeout: connect_timeout, receive_timeout: receive_timeout]
   end
@@ -396,7 +396,7 @@ defmodule Japanese.Hume do
     ]
 
     finch_opts = [
-      name: Ipoint.Finch,
+      name: Japanese.Finch,
       connect_timeout: Keyword.get(opts, :connect_timeout, 20000),
       receive_timeout: Keyword.get(opts, :receive_timeout, 60000)
     ]
@@ -425,6 +425,6 @@ defmodule Japanese.Hume do
   end
 
   def config do
-    Application.get_env(:content, __MODULE__, [])
+    Application.get_env(:japanese, __MODULE__, []) |> IO.inspect()
   end
 end

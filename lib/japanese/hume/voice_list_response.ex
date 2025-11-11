@@ -11,7 +11,7 @@ defmodule Japanese.Hume.Schemas.VoiceListResponse do
     field :page_number, :integer
     field :page_size, :integer
     field :total_pages, :integer
-    embeds_many :voices_page, Hume.Schemas.Voice
+    embeds_many :voices_page, Japanese.Hume.Schemas.Voice
   end
 
   def changeset(response \\ %__MODULE__{}, attrs) do

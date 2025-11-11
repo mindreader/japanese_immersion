@@ -20,9 +20,13 @@ if System.get_env("PHX_SERVER") do
   config :japanese, JapaneseWeb.Endpoint, server: true
 end
 
-config :japanese, Hume,
-  api_key: System.fetch_env("HUME_API_KEY"),
-  secret_key: System.fetch_env("HUME_SECRET_KEY")
+config :japanese, Japanese.Hume,
+  api_key: System.get_env("HUME_API_KEY"),
+  secret_key: System.get_env("HUME_SECRET_KEY")
+
+config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
+
+config :japanese, Japanese.Corpus.StorageLayer, corpus_dir: System.get_env("CORPUS_DIR")
 
 if config_env() == :prod do
   # Not using a database for now, but perhaps in the future
@@ -73,29 +77,3 @@ if config_env() == :prod do
     # we are accessing this often by ip.
     check_origin: false
 end
-
-if config_env() == :prod do
-  config :japanese, anthropic_api_key: System.fetch_env!("ANTHROPIC_API_KEY")
-end
-
-if config_env() == :dev do
-  key = System.get_env("ANTHROPIC_API_KEY")
-
-  if !key do
-    IO.puts("Warning: ANTHROPIC_API_KEY is not set. Calls to the Anthropic API will fail.")
-  end
-
-  config :japanese, anthropic_api_key: key
-end
-
-if config_env() == :prod do
-  config :japanese, corpus_dir: System.fetch_env!("CORPUS_DIR")
-end
-
-if config_env() == :dev do
-  config :japanese, corpus_dir: System.get_env("CORPUS_DIR", "txt")
-end
-
-timeout = System.get_env("TRANSLATION_TIMEOUT_SECONDS", "20") |> String.to_integer()
-
-config :japanese, Japanese.Translation.Service, timeout: :timer.seconds(timeout)

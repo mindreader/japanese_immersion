@@ -23,7 +23,7 @@ defmodule Japanese.Hume.Schemas.TtsResponse do
     @primary_key false
     embedded_schema do
       field :audio_file_path, :string
-      embeds_many :snippets, Hume.Schemas.TtsResponse.Snippet
+      embeds_many :snippets, Japanese.Hume.Schemas.TtsResponse.Snippet
     end
 
     def changeset(generation \\ %__MODULE__{}, attrs) do

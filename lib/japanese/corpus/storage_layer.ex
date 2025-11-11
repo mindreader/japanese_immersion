@@ -23,8 +23,8 @@ defmodule Japanese.Corpus.StorageLayer do
   @spec new() :: t()
   def new() do
     working_directory =
-      Application.get_env(:japanese, :corpus_dir) ||
-        raise "Missing :corpus_dir in :japanese config"
+      Application.get_env(:japanese, __MODULE__) ||
+        raise "CORPUS_DIR is not set in config or environment"
 
     %__MODULE__{working_directory: working_directory}
   end
