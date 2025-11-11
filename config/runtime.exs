@@ -20,6 +20,10 @@ if System.get_env("PHX_SERVER") do
   config :japanese, JapaneseWeb.Endpoint, server: true
 end
 
+config :japanese, Hume,
+  api_key: System.fetch_env("HUME_API_KEY"),
+  secret_key: System.fetch_env("HUME_SECRET_KEY")
+
 if config_env() == :prod do
   # Not using a database for now, but perhaps in the future
 
