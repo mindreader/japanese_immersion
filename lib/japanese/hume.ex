@@ -425,6 +425,6 @@ defmodule Japanese.Hume do
   end
 
   def config do
-    Application.get_env(:japanese, __MODULE__, []) |> IO.inspect()
+    Application.get_env(:japanese, __MODULE__, [])
   end
 end
