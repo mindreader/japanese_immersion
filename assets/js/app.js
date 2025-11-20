@@ -54,9 +54,14 @@ Hooks.TextSelection = {
     this.el.addEventListener('mouseup', this.handleSelection);
     this.el.addEventListener('touchend', this.handleSelection);
 
-    // Also clear when clicking elsewhere
+    // Also clear when clicking elsewhere (but not on modals or buttons)
     document.addEventListener('mousedown', (e) => {
-      if (!this.el.contains(e.target)) {
+      // Don't clear if clicking on a modal or its backdrop
+      const clickedModal = e.target.closest('[id$="-modal"]') ||
+                          e.target.closest('[phx-click*="close_"]') ||
+                          e.target.closest('button[type="button"]');
+
+      if (!this.el.contains(e.target) && !clickedModal) {
         this.pushEvent("clear_selection", {});
       }
     });

@@ -22,8 +22,24 @@
   >
     Toggle English
   </button>
+  <button
+    :if={@selected_text && !@explaining && !@explanation}
+    phx-click="start_explain"
+    class="fixed bottom-6 right-[26rem] z-50 rounded-full bg-green-600 text-white px-6 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
+    type="button"
+  >
+    Explain
+  </button>
+  <button
+    :if={@explaining}
+    phx-click="cancel_explain"
+    class="fixed bottom-6 right-[26rem] z-50 rounded-full bg-orange-500 text-white px-6 py-3 shadow-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+    type="button"
+  >
+    Cancel...
+  </button>
   <a
-    :if={@selected_text}
+    :if={@selected_text && !@explanation}
     href={"https://jpdb.io/search?q=#{URI.encode_www_form(@selected_text)}"}
     target="_blank"
     rel="noopener noreferrer"
@@ -34,3 +50,15 @@
 </div>
 
 <.back navigate={~p"/stories/#{@story}"}>Back to story</.back>
+
+<.modal
+  :if={@explanation}
+  id="explanation-modal"
+  show
+  on_cancel={JS.push("close_explanation_modal")}
+>
+  <div class="prose max-w-none">
+    <h3 class="text-lg font-semibold mb-4">Explanation</h3>
+    <p class="whitespace-pre-wrap">{@explanation}</p>
+  </div>
+</.modal>

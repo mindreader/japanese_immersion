@@ -4,7 +4,14 @@ defmodule JapaneseWeb.PageLive.Show do
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, show_translation: false, selected_text: nil)}
+    {:ok,
+     assign(socket,
+       show_translation: false,
+       selected_text: nil,
+       explaining: false,
+       explanation: nil,
+       explain_task_ref: nil
+     )}
   end
 
   @impl Phoenix.LiveView
@@ -92,5 +99,71 @@ defmodule JapaneseWeb.PageLive.Show do
   def handle_event("demo_action", _params, socket) do
     Logger.info("Demo action triggered! Selected text: #{inspect(socket.assigns.selected_text)}")
     {:noreply, socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("start_explain", _params, socket) do
+    selected_text = socket.assigns.selected_text
+
+    # Spawn async task to simulate explanation generation
+    task =
+      Task.async(fn ->
+        Process.sleep(4000)
+        # Placeholder explanation - will be replaced with LLM call later
+        "This is a placeholder explanation for: #{selected_text}"
+      end)
+
+    {:noreply,
+     socket
+     |> assign(:explaining, true)
+     |> assign(:explain_task_ref, task.ref)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("cancel_explain", _params, socket) do
+    # Cancel the task if it exists
+    if socket.assigns.explain_task_ref do
+      # We can't easily cancel a Task.async, but we can ignore its result
+      # by removing the ref from state
+    end
+
+    {:noreply,
+     socket
+     |> assign(:explaining, false)
+     |> assign(:explain_task_ref, nil)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("close_explanation_modal", _params, socket) do
+    {:noreply, assign(socket, :explanation, nil)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    # Task completed successfully
+    if ref == socket.assigns.explain_task_ref do
+      Process.demonitor(ref, [:flush])
+
+      {:noreply,
+       socket
+       |> assign(:explaining, false)
+       |> assign(:explain_task_ref, nil)
+       |> assign(:explanation, result)}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, socket) do
+    # Task crashed or was killed
+    if ref == socket.assigns.explain_task_ref do
+      {:noreply,
+       socket
+       |> assign(:explaining, false)
+       |> assign(:explain_task_ref, nil)}
+    else
+      {:noreply, socket}
+    end
   end
 end
