@@ -277,6 +277,23 @@ let
         in
         drv;
 
+      earmark =
+        let
+          version = "1.4.48";
+          drv = buildMix {
+            inherit version;
+            name = "earmark";
+            appConfigPath = ./config;
+
+            src = fetchHex {
+              inherit version;
+              pkg = "earmark";
+              sha256 = "a461a0ddfdc5432381c876af1c86c411fd78a25790c75023c7a4c035fdc858f9";
+            };
+          };
+        in
+        drv;
+
       ecto =
         let
           version = "3.13.2";

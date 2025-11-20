@@ -64,8 +64,10 @@
   show
   on_cancel={JS.push("close_explanation_modal")}
 >
-  <div class="prose max-w-none">
-    <h3 class="text-lg font-semibold mb-4">Explanation</h3>
-    <p class="whitespace-pre-wrap">{@explanation}</p>
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold text-zinc-900">Explanation</h3>
+    <div class="markdown-content text-zinc-700 leading-relaxed space-y-3">
+      {Phoenix.HTML.raw(@explanation)}
+    </div>
   </div>
 </.modal>

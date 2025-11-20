@@ -74,7 +74,8 @@ defmodule Japanese.MixProject do
       {:deps_nix, "~> 2.3.0", only: :dev},
       {:tesla, "~> 1.15"},
       {:finch, "~> 0.20.0"},
-      {:briefly, "~> 0.5.1"}
+      {:briefly, "~> 0.5.1"},
+      {:earmark, "~> 1.4"}
     ]
   end
 

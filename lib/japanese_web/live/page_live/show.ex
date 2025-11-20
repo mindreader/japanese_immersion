@@ -93,8 +93,15 @@ defmodule JapaneseWeb.PageLive.Show do
 
       explanation =
         case result do
-          {:ok, text} -> text
-          {:error, error_message} -> error_message
+          {:ok, text} ->
+            # Parse markdown to HTML
+            case Earmark.as_html(text) do
+              {:ok, html, _messages} -> html
+              {:error, _html, _messages} -> text
+            end
+
+          {:error, error_message} ->
+            error_message
         end
 
       {:noreply,
