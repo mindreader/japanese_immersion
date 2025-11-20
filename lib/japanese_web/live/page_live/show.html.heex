@@ -22,14 +22,15 @@
   >
     Toggle English
   </button>
-  <button
+  <a
     :if={@selected_text}
-    phx-click="demo_action"
+    href={"https://jpdb.io/search?q=#{URI.encode_www_form(@selected_text)}"}
+    target="_blank"
+    rel="noopener noreferrer"
     class="fixed bottom-6 right-56 z-50 rounded-full bg-blue-600 text-white px-6 py-3 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-    type="button"
   >
-    Demo Action
-  </button>
+    JPDB
+  </a>
 </div>
 
 <.back navigate={~p"/stories/#{@story}"}>Back to story</.back>
