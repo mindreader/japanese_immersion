@@ -37,6 +37,6 @@ config :phoenix_live_view,
   enable_expensive_runtime_checks: true
 
 # Set a fake corpus directory for tests
-config :japanese, :corpus_dir, "<test corpus dir>"
+config :japanese, Japanese.Corpus.StorageLayer, corpus_dir: System.tmp_dir!()
 
-config :japanese, :anthropic_api_key, "dummy-key"
+config :japanese, Japanese.Translation, api_key: "dummy-key"

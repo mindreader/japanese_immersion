@@ -24,17 +24,19 @@ config :japanese, Japanese.Hume,
   api_key: System.get_env("HUME_API_KEY"),
   secret_key: System.get_env("HUME_SECRET_KEY")
 
-config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
+if config_env() != :test do
+  config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
 
-corpus_dir =
-  System.get_env(
-    "CORPUS_DIR",
-    if config_env() == :dev do
-      "txt"
-    end
-  )
+  corpus_dir =
+    System.get_env(
+      "CORPUS_DIR",
+      if config_env() == :dev do
+        "txt"
+      end
+    )
 
-config :japanese, Japanese.Corpus.StorageLayer, corpus_dir: corpus_dir
+  config :japanese, Japanese.Corpus.StorageLayer, corpus_dir: corpus_dir
+end
 
 if config_env() == :prod do
   # Not using a database for now, but perhaps in the future
