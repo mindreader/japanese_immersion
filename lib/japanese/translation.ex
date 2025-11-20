@@ -82,6 +82,22 @@ defmodule Japanese.Translation do
   end
 
   @doc """
+  Explains Japanese text in English, breaking it down piece by piece with romaji.
+
+  Returns the explanation text as a string, or an error tuple.
+  """
+  @spec explain_text(String.t()) :: String.t() | {:error, term()}
+  def explain_text(text) when is_binary(text) do
+    system_prompt =
+      "Break down this Japanese into English, piece by piece. Make sure to include romaji.\n\nIf asked about meaning or grammar, explain and give short examples with easier vocabulary."
+
+    text
+    |> cleanup()
+    |> then(&call_anthropix(system_prompt, &1))
+    |> handle_response(:explain)
+  end
+
+  @doc """
   Translates the japanese page synchronously. This can often take some time...
 
   If you want to translate a page asynchronously, use the `Japanese.Translation.Service` module.
@@ -197,6 +213,9 @@ defmodule Japanese.Translation do
 
   defp handle_response({:ok, %{content: [%{text: text} | _]}}, :en_to_ja) when is_binary(text),
     do: %{text: text}
+
+  defp handle_response({:ok, %{content: [%{text: text} | _]}}, :explain) when is_binary(text),
+    do: text
 
   defp handle_response({:ok, %{content: []}}, _),
     do: {:error, :no_content}

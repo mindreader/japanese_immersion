@@ -105,12 +105,16 @@ defmodule JapaneseWeb.PageLive.Show do
   def handle_event("start_explain", _params, socket) do
     selected_text = socket.assigns.selected_text
 
-    # Spawn async task to simulate explanation generation
+    # Spawn async task to get explanation from LLM
     task =
       Task.async(fn ->
-        Process.sleep(4000)
-        # Placeholder explanation - will be replaced with LLM call later
-        "This is a placeholder explanation for: #{selected_text}"
+        case Japanese.Translation.explain_text(selected_text) do
+          {:error, reason} ->
+            {:error, "Failed to generate explanation: #{inspect(reason)}"}
+
+          explanation when is_binary(explanation) ->
+            {:ok, explanation}
+        end
       end)
 
     {:noreply,
@@ -144,11 +148,17 @@ defmodule JapaneseWeb.PageLive.Show do
     if ref == socket.assigns.explain_task_ref do
       Process.demonitor(ref, [:flush])
 
+      explanation =
+        case result do
+          {:ok, text} -> text
+          {:error, error_message} -> error_message
+        end
+
       {:noreply,
        socket
        |> assign(:explaining, false)
        |> assign(:explain_task_ref, nil)
-       |> assign(:explanation, result)}
+       |> assign(:explanation, explanation)}
     else
       {:noreply, socket}
     end
