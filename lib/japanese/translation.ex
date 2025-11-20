@@ -88,8 +88,25 @@ defmodule Japanese.Translation do
   """
   @spec explain_text(String.t()) :: String.t() | {:error, term()}
   def explain_text(text) when is_binary(text) do
-    system_prompt =
-      "Break down this Japanese into English, piece by piece. Make sure to include romaji.\n\nIf asked about meaning or grammar, explain and give short examples with easier vocabulary."
+    system_prompt = """
+    Break down this Japanese text into English, piece by piece. Use this format:
+
+    **Example:**
+    今日は晴れです。
+
+    **Romaji:** Kyō wa hare desu.
+
+    **Breakdown:**
+    - 今日 (きょう, kyō) = today
+    - は (wa) = topic particle
+    - 晴れ (はれ, hare) = clear weather
+    - です (desu) = polite copula "is"
+
+    **Translation:** "Today is clear/sunny."
+
+    For multiple sentences, use "Sentence 1", "Sentence 2", etc. as headers.
+    Include romaji, word-by-word breakdowns with readings and meanings, and full translations.
+    """
 
     text
     |> cleanup()
