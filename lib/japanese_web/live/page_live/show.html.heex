@@ -7,8 +7,12 @@
   </:actions>
 </.header>
 
-<div class="relative flex flex-col h-[60vh] mt-8">
-  <div id="story-scroll-container" phx-hook="ScrollPosition" class="flex-1 overflow-y-auto rounded border p-4 bg-white shadow">
+<div id="story-container" phx-hook="TextSelection" class="relative flex flex-col h-[60vh] mt-8">
+  <div
+    id="story-scroll-container"
+    phx-hook="ScrollPosition"
+    class="flex-1 overflow-y-auto rounded border p-4 bg-white shadow"
+  >
     <.translation id="translation-display" content={@translation} />
   </div>
   <button
@@ -17,6 +21,14 @@
     type="button"
   >
     Toggle English
+  </button>
+  <button
+    :if={@selected_text}
+    phx-click="demo_action"
+    class="fixed bottom-6 right-56 z-50 rounded-full bg-blue-600 text-white px-6 py-3 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+    type="button"
+  >
+    Demo Action
   </button>
 </div>
 

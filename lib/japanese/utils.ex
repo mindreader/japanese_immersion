@@ -19,7 +19,9 @@ defmodule Japanese.Utils do
       {:ok, [%{japanese: "「来訪者　②」", japanese_tts: "来訪者　②", english: "Visitor ②"}, ...]}
 
   """
-  @spec parse_japanese_statements(Page.t()) :: {:ok, [%{japanese: String.t(), japanese_tts: String.t(), english: String.t()}]} | {:error, term()}
+  @spec parse_japanese_statements(Page.t()) ::
+          {:ok, [%{japanese: String.t(), japanese_tts: String.t(), english: String.t()}]}
+          | {:error, term()}
   def parse_japanese_statements(%Page{} = page) do
     case Page.get_translation(page) do
       {:ok, %{translation: translation}} ->

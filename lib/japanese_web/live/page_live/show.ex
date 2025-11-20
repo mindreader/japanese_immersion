@@ -4,7 +4,7 @@ defmodule JapaneseWeb.PageLive.Show do
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, show_translation: false)}
+    {:ok, assign(socket, show_translation: false, selected_text: nil)}
   end
 
   @impl Phoenix.LiveView
@@ -76,5 +76,21 @@ defmodule JapaneseWeb.PageLive.Show do
       _ ->
         {:noreply, socket}
     end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("text_selected", %{"text" => text}, socket) do
+    {:noreply, assign(socket, :selected_text, text)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("clear_selection", _params, socket) do
+    {:noreply, assign(socket, :selected_text, nil)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("demo_action", _params, socket) do
+    Logger.info("Demo action triggered! Selected text: #{inspect(socket.assigns.selected_text)}")
+    {:noreply, socket}
   end
 end

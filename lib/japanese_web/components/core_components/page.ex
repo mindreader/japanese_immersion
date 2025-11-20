@@ -25,7 +25,7 @@ defmodule JapaneseWeb.CoreComponents.Page do
           <%= if Map.get(entry, :paragraph_break, false) do %>
             <div style="height: 1.5em;"></div>
           <% else %>
-            <div class="font-serif text-lg">
+            <div class="tr-ja font-serif text-lg">
               {entry.japanese}
             </div>
             <div

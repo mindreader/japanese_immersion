@@ -24,6 +24,50 @@ import topbar from "../vendor/topbar"
 
 // Hook to preserve scroll position in sessionStorage
 let Hooks = {};
+
+Hooks.TextSelection = {
+  mounted() {
+    this.handleSelection = () => {
+      const selection = window.getSelection();
+      const selectedText = selection.toString().trim();
+
+      if (selectedText) {
+        // Check if selection is within a tr-ja container
+        const range = selection.getRangeAt(0);
+        let container = range.commonAncestorContainer;
+
+        // Walk up the DOM tree to find if we're inside a tr-ja element
+        while (container && container !== this.el) {
+          if (container.classList && container.classList.contains('tr-ja')) {
+            // We're selecting Japanese text!
+            this.pushEvent("text_selected", { text: selectedText });
+            return;
+          }
+          container = container.parentElement;
+        }
+      }
+
+      // If no Japanese text selected, clear selection
+      this.pushEvent("clear_selection", {});
+    };
+
+    this.el.addEventListener('mouseup', this.handleSelection);
+    this.el.addEventListener('touchend', this.handleSelection);
+
+    // Also clear when clicking elsewhere
+    document.addEventListener('mousedown', (e) => {
+      if (!this.el.contains(e.target)) {
+        this.pushEvent("clear_selection", {});
+      }
+    });
+  },
+
+  destroyed() {
+    this.el.removeEventListener('mouseup', this.handleSelection);
+    this.el.removeEventListener('touchend', this.handleSelection);
+  }
+};
+
 Hooks.ScrollPosition = {
   mounted() {
     const key = `scroll-position:${window.location.pathname}`;
