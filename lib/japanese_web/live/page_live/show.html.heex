@@ -15,38 +15,45 @@
   >
     <.translation id="translation-display" content={@translation} />
   </div>
-  <button
-    onclick="toggleVisibilityByClass('tr-eng')"
-    class="fixed bottom-6 right-6 z-50 rounded-full bg-zinc-900 text-white px-6 py-3 shadow-lg hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-    type="button"
-  >
-    Toggle English
-  </button>
-  <button
-    :if={@selected_text && !@explaining && !@explanation}
-    phx-click="start_explain"
-    class="fixed bottom-6 right-[26rem] z-50 rounded-full bg-green-600 text-white px-6 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
-    type="button"
-  >
-    Explain
-  </button>
-  <button
-    :if={@explaining}
-    phx-click="cancel_explain"
-    class="fixed bottom-6 right-[26rem] z-50 rounded-full bg-orange-500 text-white px-6 py-3 shadow-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
-    type="button"
-  >
-    Cancel...
-  </button>
-  <a
-    :if={@selected_text && !@explanation}
-    href={"https://jpdb.io/search?q=#{URI.encode_www_form(@selected_text)}"}
-    target="_blank"
-    rel="noopener noreferrer"
-    class="fixed bottom-6 right-56 z-50 rounded-full bg-blue-600 text-white px-6 py-3 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
-  >
-    JPDB
-  </a>
+  <!-- Action buttons container - vertical on mobile, horizontal on desktop -->
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-4 md:flex-row-reverse">
+    <!-- Toggle English - bottom on mobile, rightmost on desktop (most common) -->
+    <button
+      onclick="toggleVisibilityByClass('tr-eng')"
+      class="rounded-full bg-zinc-900 text-white px-6 py-3 shadow-lg hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+      type="button"
+    >
+      Toggle English
+    </button>
+    <!-- JPDB button - middle on mobile, center on desktop, hidden for long text -->
+    <a
+      :if={@selected_text && !@explanation && String.length(@selected_text) <= 14}
+      href={"https://jpdb.io/search?q=#{URI.encode_www_form(@selected_text)}"}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="rounded-full bg-blue-600 text-white px-6 py-3 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition text-center"
+    >
+      JPDB
+    </a>
+    <!-- Explain button - top on mobile, leftmost on desktop -->
+    <button
+      :if={@selected_text && !@explaining && !@explanation}
+      phx-click="start_explain"
+      class="rounded-full bg-green-600 text-white px-6 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
+      type="button"
+    >
+      Explain
+    </button>
+    <!-- Cancel button - same position as Explain -->
+    <button
+      :if={@explaining}
+      phx-click="cancel_explain"
+      class="rounded-full bg-orange-500 text-white px-6 py-3 shadow-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
+      type="button"
+    >
+      Cancel...
+    </button>
+  </div>
 </div>
 
 <.back navigate={~p"/stories/#{@story}"}>Back to story</.back>
