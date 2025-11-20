@@ -22,10 +22,44 @@ import {Socket} from "phoenix"
 import {LiveSocket} from "phoenix_live_view"
 import topbar from "../vendor/topbar"
 
+// Hook to preserve scroll position in sessionStorage
+let Hooks = {};
+Hooks.ScrollPosition = {
+  mounted() {
+    const key = `scroll-position:${window.location.pathname}`;
+    const savedPosition = sessionStorage.getItem(key);
+
+    if (savedPosition) {
+      this.el.scrollTop = parseInt(savedPosition, 10);
+    }
+
+    this.handleScroll = () => {
+      sessionStorage.setItem(key, this.el.scrollTop);
+    };
+
+    this.el.addEventListener('scroll', this.handleScroll);
+  },
+
+  updated() {
+    // Restore scroll position after DOM updates (e.g., toggling translation)
+    const key = `scroll-position:${window.location.pathname}`;
+    const savedPosition = sessionStorage.getItem(key);
+
+    if (savedPosition) {
+      this.el.scrollTop = parseInt(savedPosition, 10);
+    }
+  },
+
+  destroyed() {
+    this.el.removeEventListener('scroll', this.handleScroll);
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
-  params: {_csrf_token: csrfToken}
+  params: {_csrf_token: csrfToken},
+  hooks: Hooks
 })
 
 // Show progress bar on live navigation and form submits

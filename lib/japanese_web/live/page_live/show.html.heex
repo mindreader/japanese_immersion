@@ -8,7 +8,7 @@
 </.header>
 
 <div class="relative flex flex-col h-[60vh] mt-8">
-  <div class="flex-1 overflow-y-auto rounded border p-4 bg-white shadow">
+  <div id="story-scroll-container" phx-hook="ScrollPosition" class="flex-1 overflow-y-auto rounded border p-4 bg-white shadow">
     <.translation id="translation-display" content={@translation} />
   </div>
   <button
