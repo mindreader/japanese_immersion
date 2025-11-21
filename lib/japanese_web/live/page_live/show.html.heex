@@ -27,7 +27,7 @@
     </button>
     <!-- JPDB button - middle on mobile, center on desktop, hidden for long text -->
     <a
-      :if={@selected_text && !@explanation && String.length(@selected_text) <= 14}
+      :if={@selected_text && !@explanation}
       href={"https://jpdb.io/search?q=#{URI.encode_www_form(@selected_text)}"}
       target="_blank"
       rel="noopener noreferrer"
