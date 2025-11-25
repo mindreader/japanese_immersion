@@ -1,0 +1,92 @@
+<.header>
+  Audio Practice
+  <:subtitle>
+    <%= case @context do %>
+      <% {:story, story} -> %>
+        Story: {story.name}
+      <% {:page, page} -> %>
+        Story: {page.story} - Page {page.number}
+      <% _ -> %>
+    <% end %>
+  </:subtitle>
+</.header>
+
+<div :if={@error} class="mt-8 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+  {@error}
+</div>
+
+<div :if={@snippet && !@error} class="mt-8 space-y-6">
+  <!-- Audio Player -->
+  <audio
+    id={"audio-player-#{@snippet.audio_path |> :erlang.phash2()}"}
+    src={audio_url(@snippet)}
+    phx-hook="AudioPlayer"
+    controls
+    autoplay
+    class="w-full"
+  >
+    Your browser does not support the audio element.
+  </audio>
+  
+<!-- Reveal Buttons -->
+  <div class="flex gap-4">
+    <button
+      :if={!@show_japanese}
+      phx-click="reveal_japanese"
+      class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      type="button"
+    >
+      Show Japanese
+    </button>
+
+    <button
+      :if={!@show_english}
+      phx-click="reveal_english"
+      class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+      type="button"
+    >
+      Show English
+    </button>
+  </div>
+  
+<!-- Text Display -->
+  <div class="space-y-4">
+    <div :if={@show_japanese} class="p-4 bg-zinc-50 border border-zinc-200 rounded-lg">
+      <div class="text-sm font-medium text-zinc-600 mb-2">Japanese:</div>
+      <div class="text-xl text-zinc-900">{@snippet.japanese}</div>
+    </div>
+
+    <div :if={@show_english} class="p-4 bg-zinc-50 border border-zinc-200 rounded-lg">
+      <div class="text-sm font-medium text-zinc-600 mb-2">English:</div>
+      <div class="text-lg text-zinc-900">{@snippet.english}</div>
+    </div>
+  </div>
+  
+<!-- Next Button -->
+  <div>
+    <button
+      phx-click="next_snippet"
+      class="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+      type="button"
+    >
+      Next Snippet
+    </button>
+  </div>
+  
+<!-- Voice Info -->
+  <div class="text-sm text-zinc-500">
+    Voice: {@snippet.voice}
+  </div>
+</div>
+
+<.back
+  :if={@context}
+  navigate={
+    case @context do
+      {:story, story} -> ~p"/stories/#{story}"
+      {:page, page} -> ~p"/stories/#{page.story}/#{page}"
+    end
+  }
+>
+  Back
+</.back>

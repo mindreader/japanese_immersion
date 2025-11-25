@@ -27,6 +27,10 @@ defmodule JapaneseWeb.Router do
     live "/stories/:name/edit", StoryLive.Show, :edit
     live "/stories/:name/:page", PageLive.Show, :show
     get "/stories/:name/:page/japanese", PageController, :japanese
+
+    live "/audio/:story", AudioLive.Show, :story
+    live "/audio/:story/:page_number", AudioLive.Show, :page
+    get "/audio-files/:story/:filename", AudioController, :serve
   end
 
   # Other scopes may use custom stacks.

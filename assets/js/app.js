@@ -104,6 +104,23 @@ Hooks.ScrollPosition = {
   }
 };
 
+Hooks.AudioPlayer = {
+  mounted() {
+    this.setupAudio();
+  },
+
+  updated() {
+    this.setupAudio();
+  },
+
+  setupAudio() {
+    // Set preservesPitch to maintain audio quality if user adjusts speed via browser controls
+    this.el.preservesPitch = true;
+    this.el.mozPreservesPitch = true; // Firefox
+    this.el.webkitPreservesPitch = true; // Safari
+  }
+};
+
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
   longPollFallbackMs: 2500,
