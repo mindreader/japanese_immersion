@@ -38,6 +38,18 @@
       Edit
     </button>
     <button
+      :if={!Map.has_key?(@generating_page_audio, page.number)}
+      phx-click="show_page_voice_selection"
+      phx-value-page_number={page.number}
+      class="ml-2 text-blue-600 hover:underline"
+      type="button"
+    >
+      Generate Audio
+    </button>
+    <span :if={Map.has_key?(@generating_page_audio, page.number)} class="ml-2 text-gray-500">
+      Generating...
+    </span>
+    <button
       phx-click="delete_page"
       phx-value-number={page.number}
       class="ml-2 text-red-600 hover:underline"
@@ -108,4 +120,75 @@
     </:actions>
   </.simple_form>
   <.error :if={@edit_page_error}>{@edit_page_error}</.error>
+</.modal>
+
+<.modal
+  :if={@voice_selection_page}
+  id="page-voice-selection-modal"
+  show
+  on_cancel={JS.push("close_page_voice_modal")}
+>
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold text-zinc-900">Select Voice for Audio Generation</h3>
+    <p class="text-sm text-zinc-600">
+      Choose a voice to generate audio for page {@voice_selection_page}
+    </p>
+
+    <div class="grid grid-cols-1 gap-3">
+      <button
+        phx-click="generate_page_audio"
+        phx-value-page_number={@voice_selection_page}
+        phx-value-voice="jf_alpha"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Alpha</div>
+        <div class="text-sm text-zinc-600">jf_alpha</div>
+      </button>
+
+      <button
+        phx-click="generate_page_audio"
+        phx-value-page_number={@voice_selection_page}
+        phx-value-voice="jf_gongitsune"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Gongitsune</div>
+        <div class="text-sm text-zinc-600">jf_gongitsune</div>
+      </button>
+
+      <button
+        phx-click="generate_page_audio"
+        phx-value-page_number={@voice_selection_page}
+        phx-value-voice="jf_nezumi"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Nezumi</div>
+        <div class="text-sm text-zinc-600">jf_nezumi</div>
+      </button>
+
+      <button
+        phx-click="generate_page_audio"
+        phx-value-page_number={@voice_selection_page}
+        phx-value-voice="jf_tebukuro"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Tebukuro</div>
+        <div class="text-sm text-zinc-600">jf_tebukuro</div>
+      </button>
+
+      <button
+        phx-click="generate_page_audio"
+        phx-value-page_number={@voice_selection_page}
+        phx-value-voice="jm_kumo"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Male - Kumo</div>
+        <div class="text-sm text-zinc-600">jm_kumo</div>
+      </button>
+    </div>
+  </div>
 </.modal>

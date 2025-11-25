@@ -7,27 +7,36 @@
   </:actions>
 </.header>
 
-<.table
-  id="stories"
-  rows={@streams.stories}
-  row_click={fn {_id, story} -> JS.navigate(~p"/stories/#{story}") end}
->
-  <:col :let={{_id, story}} label="Name">{story.name}</:col>
-  <:action :let={{_id, story}}>
-    <div class="sr-only">
-      <.link navigate={~p"/stories/#{story}"}>Show</.link>
-    </div>
-    <.link patch={~p"/stories/#{story}/edit"}>Edit</.link>
-  </:action>
-  <:action :let={{id, story}}>
+<h3 class="mt-8 text-lg font-semibold">Stories</h3>
+<ul id="stories" phx-update="stream">
+  <li :for={{id, story} <- @streams.stories} id={id} class="flex items-center gap-4 py-1">
+    <.link navigate={~p"/stories/#{story}"} class="text-blue-600 hover:underline">
+      {story.name}
+    </.link>
+    <.link patch={~p"/stories/#{story}/edit"} class="ml-2 text-green-600 hover:underline">
+      Edit
+    </.link>
+    <button
+      :if={!Map.has_key?(@generating_story_audio, story.name)}
+      phx-click="show_story_voice_selection"
+      phx-value-story={story.name}
+      class="ml-2 text-blue-600 hover:underline"
+      type="button"
+    >
+      Generate Audio
+    </button>
+    <span :if={Map.has_key?(@generating_story_audio, story.name)} class="ml-2 text-gray-500">
+      Generating...
+    </span>
     <.link
       phx-click={JS.push("delete", value: %{id: story.name}) |> hide("##{id}")}
       data-confirm="Are you sure?"
+      class="ml-2 text-red-600 hover:underline"
     >
       Delete
     </.link>
-  </:action>
-</.table>
+  </li>
+</ul>
 
 <.modal
   :if={@live_action in [:new, :edit]}
@@ -43,4 +52,75 @@
     story={@story}
     patch={~p"/stories"}
   />
+</.modal>
+
+<.modal
+  :if={@voice_selection_story}
+  id="voice-selection-modal"
+  show
+  on_cancel={JS.push("close_story_voice_modal")}
+>
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold text-zinc-900">Select Voice for Audio Generation</h3>
+    <p class="text-sm text-zinc-600">
+      Choose a voice to generate audio for story '{@voice_selection_story}'
+    </p>
+
+    <div class="grid grid-cols-1 gap-3">
+      <button
+        phx-click="generate_story_audio"
+        phx-value-story={@voice_selection_story}
+        phx-value-voice="jf_alpha"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Alpha</div>
+        <div class="text-sm text-zinc-600">jf_alpha</div>
+      </button>
+
+      <button
+        phx-click="generate_story_audio"
+        phx-value-story={@voice_selection_story}
+        phx-value-voice="jf_gongitsune"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Gongitsune</div>
+        <div class="text-sm text-zinc-600">jf_gongitsune</div>
+      </button>
+
+      <button
+        phx-click="generate_story_audio"
+        phx-value-story={@voice_selection_story}
+        phx-value-voice="jf_nezumi"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Nezumi</div>
+        <div class="text-sm text-zinc-600">jf_nezumi</div>
+      </button>
+
+      <button
+        phx-click="generate_story_audio"
+        phx-value-story={@voice_selection_story}
+        phx-value-voice="jf_tebukuro"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Female - Tebukuro</div>
+        <div class="text-sm text-zinc-600">jf_tebukuro</div>
+      </button>
+
+      <button
+        phx-click="generate_story_audio"
+        phx-value-story={@voice_selection_story}
+        phx-value-voice="jm_kumo"
+        class="px-4 py-3 text-left border border-zinc-300 rounded-lg hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        type="button"
+      >
+        <div class="font-medium">Male - Kumo</div>
+        <div class="text-sm text-zinc-600">jm_kumo</div>
+      </button>
+    </div>
+  </div>
 </.modal>

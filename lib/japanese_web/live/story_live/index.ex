@@ -11,6 +11,8 @@ defmodule JapaneseWeb.StoryLive.Index do
       |> Phoenix.LiveView.stream_configure(:stories,
         dom_id: fn %Story{name: name} -> "story-#{name}" end
       )
+      |> assign(:generating_story_audio, %{})
+      |> assign(:voice_selection_story, nil)
 
     {:ok, stream(socket, :stories, Corpus.list_stories())}
   end
@@ -44,6 +46,66 @@ defmodule JapaneseWeb.StoryLive.Index do
   end
 
   @impl Phoenix.LiveView
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    # Find which story this task belongs to
+    story_name =
+      Enum.find_value(socket.assigns.generating_story_audio, fn {name, task_ref} ->
+        if task_ref == ref, do: name
+      end)
+
+    if story_name do
+      Process.demonitor(ref, [:flush])
+
+      socket =
+        case result do
+          {:ok, audio_files} ->
+            put_flash(
+              socket,
+              :info,
+              "Generated #{length(audio_files)} audio files for story '#{story_name}'"
+            )
+
+          {:error, reason} ->
+            put_flash(
+              socket,
+              :error,
+              "Failed to generate audio for story '#{story_name}': #{inspect(reason)}"
+            )
+        end
+
+      {:noreply,
+       assign(
+         socket,
+         :generating_story_audio,
+         Map.delete(socket.assigns.generating_story_audio, story_name)
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, socket) when is_reference(ref) do
+    # Find which story this task belongs to
+    story_name =
+      Enum.find_value(socket.assigns.generating_story_audio, fn {name, task_ref} ->
+        if task_ref == ref, do: name
+      end)
+
+    if story_name do
+      {:noreply,
+       socket
+       |> put_flash(:error, "Audio generation failed unexpectedly for story '#{story_name}'")
+       |> assign(
+         :generating_story_audio,
+         Map.delete(socket.assigns.generating_story_audio, story_name)
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl Phoenix.LiveView
   def handle_event("delete", %{"id" => name}, socket) do
     case Story.get_by_name(name) do
       {:error, :not_found} ->
@@ -58,5 +120,39 @@ defmodule JapaneseWeb.StoryLive.Index do
             {:noreply, put_flash(socket, :error, "Failed to delete story: #{inspect(reason)}")}
         end
     end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("show_story_voice_selection", %{"story" => name}, socket) do
+    {:noreply, assign(socket, :voice_selection_story, name)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("generate_story_audio", %{"story" => name, "voice" => voice_str}, socket) do
+    case Story.get_by_name(name) do
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Story not found")}
+
+      {:ok, story} ->
+        voice = String.to_existing_atom(voice_str)
+
+        task =
+          Task.async(fn ->
+            Japanese.Corpus.Audio.generate_for_story(story, voice, skip_existing: true)
+          end)
+
+        {:noreply,
+         socket
+         |> assign(
+           :generating_story_audio,
+           Map.put(socket.assigns.generating_story_audio, name, task.ref)
+         )
+         |> assign(:voice_selection_story, nil)}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("close_story_voice_modal", _params, socket) do
+    {:noreply, assign(socket, :voice_selection_story, nil)}
   end
 end

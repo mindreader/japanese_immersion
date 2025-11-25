@@ -75,6 +75,45 @@ defmodule Japanese.Corpus.Audio do
   end
 
   @doc """
+  Generate audio files for all pages in a story.
+
+  Takes a story, and generates TTS audio for all snippets across all pages.
+  By default, skips snippets that already have audio files generated.
+
+  ## Parameters
+  - `story` - A Story struct
+  - `voice` - Voice atom (e.g., :jf_alpha, :jf_gongitsune, :jf_nezumi, :jf_tebukuro, :jm_kumo)
+  - `opts` - Optional keyword list:
+    - `:skip_existing` - Skip snippets with existing audio (default: true)
+    - `:limit` - Maximum number of snippets to process per page (for testing)
+    - Other opts are passed to Japanese.Fal.tts/4 (e.g., :speed)
+
+  ## Returns
+  {:ok, results} where results is a list of all audio files generated across all pages
+  {:error, reason} if generation fails for all pages
+
+  ## Examples
+      iex> story = %Story{name: "story1"}
+      iex> Japanese.Corpus.Audio.generate_for_story(story, :jf_alpha)
+      {:ok, [%{japanese: "...", file_path: "..."}, ...]}
+  """
+  @spec generate_for_story(Story.t(), atom(), keyword()) ::
+          {:ok, [%{japanese: String.t(), file_path: String.t()}]} | {:error, term()}
+  def generate_for_story(%Story{} = story, voice, opts \\ []) do
+    pages = Story.list_pages(story)
+
+    results =
+      Enum.flat_map(pages, fn page ->
+        case generate_for_page(page, voice, opts) do
+          {:ok, page_results} -> page_results
+          {:error, _reason} -> []
+        end
+      end)
+
+    {:ok, results}
+  end
+
+  @doc """
   Get a random snippet with audio from a page or story.
 
   Returns a random snippet that has audio generated for at least one voice.

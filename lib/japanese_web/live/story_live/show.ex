@@ -5,7 +5,13 @@ defmodule JapaneseWeb.StoryLive.Show do
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
-    {:ok, assign(socket, new_page_text: nil, new_page_error: nil)}
+    {:ok,
+     assign(socket,
+       new_page_text: nil,
+       new_page_error: nil,
+       generating_page_audio: %{},
+       voice_selection_page: nil
+     )}
   end
 
   defp manage_story_pubsub_subscription(old_story, new_story) do
@@ -174,6 +180,111 @@ defmodule JapaneseWeb.StoryLive.Show do
      |> assign(:pages, pages)
      |> put_flash(:info, "Story renamed successfully")
      |> push_patch(to: ~p"/stories/#{story.name}")}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({ref, result}, socket) when is_reference(ref) do
+    # Find which page this task belongs to
+    page_number =
+      Enum.find_value(socket.assigns.generating_page_audio, fn {number, task_ref} ->
+        if task_ref == ref, do: number
+      end)
+
+    if page_number do
+      Process.demonitor(ref, [:flush])
+
+      socket =
+        case result do
+          {:ok, audio_files} ->
+            put_flash(
+              socket,
+              :info,
+              "Generated #{length(audio_files)} audio files for page #{page_number}"
+            )
+
+          {:error, reason} ->
+            put_flash(
+              socket,
+              :error,
+              "Failed to generate audio for page #{page_number}: #{inspect(reason)}"
+            )
+        end
+
+      {:noreply,
+       assign(
+         socket,
+         :generating_page_audio,
+         Map.delete(socket.assigns.generating_page_audio, page_number)
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, socket) when is_reference(ref) do
+    # Find which page this task belongs to
+    page_number =
+      Enum.find_value(socket.assigns.generating_page_audio, fn {number, task_ref} ->
+        if task_ref == ref, do: number
+      end)
+
+    if page_number do
+      {:noreply,
+       socket
+       |> put_flash(:error, "Audio generation failed unexpectedly for page #{page_number}")
+       |> assign(
+         :generating_page_audio,
+         Map.delete(socket.assigns.generating_page_audio, page_number)
+       )}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("show_page_voice_selection", %{"page_number" => number_str}, socket) do
+    case Integer.parse(number_str) do
+      {page_number, ""} ->
+        {:noreply, assign(socket, :voice_selection_page, page_number)}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid page number")}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event(
+        "generate_page_audio",
+        %{"page_number" => number_str, "voice" => voice_str},
+        socket
+      ) do
+    with {page_number, ""} <- Integer.parse(number_str),
+         page when not is_nil(page) <-
+           Enum.find(socket.assigns.pages, &(&1.number == page_number)) do
+      voice = String.to_existing_atom(voice_str)
+
+      task =
+        Task.async(fn ->
+          Japanese.Corpus.Audio.generate_for_page(page, voice, skip_existing: true)
+        end)
+
+      {:noreply,
+       socket
+       |> assign(
+         :generating_page_audio,
+         Map.put(socket.assigns.generating_page_audio, page_number, task.ref)
+       )
+       |> assign(:voice_selection_page, nil)}
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not find page for audio generation")}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("close_page_voice_modal", _params, socket) do
+    {:noreply, assign(socket, :voice_selection_page, nil)}
   end
 
   defp page_title(:show), do: "Show Story"
