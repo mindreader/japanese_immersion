@@ -219,11 +219,12 @@ defmodule Japanese.Fal do
   @valid_voices [:jf_alpha, :jf_gongitsune, :jf_nezumi, :jf_tebukuro, :jm_kumo]
 
   @doc """
-  Generate Japanese text-to-speech audio and save it to the corpus audio directory.
+  Generate Japanese text-to-speech audio and save it to the story's audio directory.
 
   ## Parameters
   - `voice` - Voice ID atom (one of: :jf_alpha, :jf_gongitsune, :jf_nezumi, :jf_tebukuro, :jm_kumo)
   - `text` - Japanese text to convert to speech
+  - `story` - Story name (directory name)
   - `filename` - Filename to save the audio as (e.g., "jf_alpha_abc123.mp3")
   - `opts` - Optional keyword list with the following supported options:
     - `:speed` - Speed of the generated audio (float, defaults to 1.0)
@@ -233,12 +234,14 @@ defmodule Japanese.Fal do
     - `:receive_timeout` - Receive timeout in milliseconds (integer, defaults to 20000)
 
   ## Examples
-      iex> Japanese.Fal.tts(:jf_alpha, "こんにちは", "jf_alpha_abc123.mp3")
-      {:ok, "/path/to/corpus/audio/jf_alpha_abc123.mp3"}
+      iex> Japanese.Fal.tts(:jf_alpha, "こんにちは", "story1", "jf_alpha_abc123.mp3")
+      {:ok, "/path/to/corpus/story1/audio/jf_alpha_abc123.mp3"}
   """
-  @spec tts(atom(), String.t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
-  def tts(voice, text, filename, opts \\ [])
-      when voice in @valid_voices and is_binary(text) and is_binary(filename) do
+  @spec tts(atom(), String.t(), String.t(), String.t(), keyword()) ::
+          {:ok, String.t()} | {:error, term()}
+  def tts(voice, text, story, filename, opts \\ [])
+      when voice in @valid_voices and is_binary(text) and is_binary(story) and
+             is_binary(filename) do
     speed = Keyword.get(opts, :speed, 1.0)
 
     data = %{
@@ -251,7 +254,7 @@ defmodule Japanese.Fal do
          {:ok, audio_url} <- extract_audio_url(response),
          storage <- Japanese.Corpus.StorageLayer.new(),
          {:ok, file_path} <-
-           Japanese.Corpus.StorageLayer.save_audio_from_url(storage, filename, audio_url) do
+           Japanese.Corpus.StorageLayer.save_audio_from_url(storage, story, filename, audio_url) do
       {:ok, file_path}
     end
   end

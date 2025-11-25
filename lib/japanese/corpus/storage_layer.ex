@@ -348,14 +348,22 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
-  Download an audio file from a URL and save it to the audio subdirectory.
+  Download an audio file from a URL and save it to the audio subdirectory within a story.
+  Detects the file extension from the URL and appends it to the filename.
   Creates the audio directory if it doesn't exist.
   Returns {:ok, full_path} on success or {:error, reason} on failure.
   """
-  @spec save_audio_from_url(t(), String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
-  def save_audio_from_url(%__MODULE__{working_directory: wd}, filename, url) do
-    audio_dir = Path.join(wd, "audio")
-    file_path = Path.join(audio_dir, filename)
+  @spec save_audio_from_url(t(), String.t(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, term()}
+  def save_audio_from_url(%__MODULE__{working_directory: wd}, story, filename, url) do
+    audio_dir = Path.join([wd, story, "audio"])
+
+    # Extract extension from URL, remove any existing extension from filename
+    extension = Path.extname(url)
+    base_filename = Path.rootname(filename)
+    final_filename = base_filename <> extension
+
+    file_path = Path.join(audio_dir, final_filename)
 
     with :ok <- File.mkdir_p(audio_dir),
          {:ok, response} <- download_file(url),
