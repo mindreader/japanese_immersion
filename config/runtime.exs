@@ -24,8 +24,7 @@ config :japanese, Japanese.Hume,
   api_key: System.get_env("HUME_API_KEY"),
   secret_key: System.get_env("HUME_SECRET_KEY")
 
-config :japanese, Japanese.Fal,
-  api_key: System.get_env("FAL_API_KEY")
+config :japanese, Japanese.Fal, api_key: System.get_env("FAL_API_KEY")
 
 if config_env() != :test do
   config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")

@@ -75,8 +75,10 @@ defmodule Japanese.Fal do
       ...> )
       {:ok, %QueuedRequest{}}
   """
-  def queue(model, data, opts \\ []) when is_binary(model) and is_map(data) do
+  def queue(model, data, opts \\ []) when (is_binary(model) or is_atom(model)) and is_map(data) do
     timeout_opts = build_timeout_opts(opts)
+
+    model = to_string(model)
 
     post(model, data, timeout_opts)
     |> case do
@@ -95,7 +97,7 @@ defmodule Japanese.Fal do
   then retrieves and returns the response.
 
   ## Parameters
-  - `model` - The model to use (e.g., "fal-ai/qwen-image-edit-plus-lora")
+  - `model` - The model to use (e.g., "fal-ai/qwen-image-edit-plus-lora" or :"fal-ai/kokoro/japanese")
   - `data` - Map of data to send to the API
   - `opts` - Optional keyword list with the following supported options:
     - `:poll_interval` - Milliseconds between status checks (integer, defaults to 1000)
@@ -110,7 +112,8 @@ defmodule Japanese.Fal do
       ...> )
       {:ok, %{...}}
   """
-  def queue_and_wait(model, data, opts \\ []) when is_binary(model) and is_map(data) do
+  def queue_and_wait(model, data, opts \\ [])
+      when (is_binary(model) or is_atom(model)) and is_map(data) do
     poll_interval = Keyword.get(opts, :poll_interval, 1000)
     max_wait_time = Keyword.get(opts, :max_wait_time, 300_000)
     start_time = System.monotonic_time(:millisecond)
@@ -211,6 +214,53 @@ defmodule Japanese.Fal do
   def cancel(%QueuedRequest{cancel_path: path} = _queued_request, opts \\ []) do
     timeout_opts = build_timeout_opts(opts)
     put(path, %{}, timeout_opts)
+  end
+
+  @valid_voices [:jf_alpha, :jf_gongitsune, :jf_nezumi, :jf_tebukuro, :jm_kumo]
+
+  @doc """
+  Generate Japanese text-to-speech audio and save it to the corpus audio directory.
+
+  ## Parameters
+  - `voice` - Voice ID atom (one of: :jf_alpha, :jf_gongitsune, :jf_nezumi, :jf_tebukuro, :jm_kumo)
+  - `text` - Japanese text to convert to speech
+  - `filename` - Filename to save the audio as (e.g., "jf_alpha_abc123.mp3")
+  - `opts` - Optional keyword list with the following supported options:
+    - `:speed` - Speed of the generated audio (float, defaults to 1.0)
+    - `:poll_interval` - Milliseconds between status checks (integer, defaults to 1000)
+    - `:max_wait_time` - Maximum time to wait in milliseconds (integer, defaults to 300000)
+    - `:connect_timeout` - Connection timeout in milliseconds (integer, defaults to 20000)
+    - `:receive_timeout` - Receive timeout in milliseconds (integer, defaults to 20000)
+
+  ## Examples
+      iex> Japanese.Fal.tts(:jf_alpha, "こんにちは", "jf_alpha_abc123.mp3")
+      {:ok, "/path/to/corpus/audio/jf_alpha_abc123.mp3"}
+  """
+  @spec tts(atom(), String.t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
+  def tts(voice, text, filename, opts \\ [])
+      when voice in @valid_voices and is_binary(text) and is_binary(filename) do
+    speed = Keyword.get(opts, :speed, 1.0)
+
+    data = %{
+      prompt: text,
+      voice: voice,
+      speed: speed
+    }
+
+    with {:ok, response} <- queue_and_wait(:"fal-ai/kokoro/japanese", data, opts),
+         {:ok, audio_url} <- extract_audio_url(response),
+         storage <- Japanese.Corpus.StorageLayer.new(),
+         {:ok, file_path} <-
+           Japanese.Corpus.StorageLayer.save_audio_from_url(storage, filename, audio_url) do
+      {:ok, file_path}
+    end
+  end
+
+  defp extract_audio_url(%{"audio" => %{"url" => url}}), do: {:ok, url}
+  defp extract_audio_url(%{"audio" => url}) when is_binary(url), do: {:ok, url}
+
+  defp extract_audio_url(_) do
+    {:error, :audio_url_not_found}
   end
 
   defp build_timeout_opts(opts) do
