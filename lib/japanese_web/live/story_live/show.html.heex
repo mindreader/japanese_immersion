@@ -16,15 +16,12 @@
 
 <h3 class="mt-8 text-lg font-semibold">Pages</h3>
 <ul>
-  <li
-    :for={page <- @pages}
-    class="grid grid-cols-[minmax(0,1fr)_8rem_auto_auto] items-center gap-4 py-1"
-  >
+  <li :for={page <- @pages} class="flex items-center gap-4 py-1">
     <.link navigate={~p"/stories/#{@story}/#{page}"} class="text-blue-600 hover:underline">
       Page #{page.number}
     </.link>
     <span class={[
-      "text-center font-semibold",
+      "ml-2 w-28 inline-block text-center font-semibold",
       if(page.translated?, do: "text-green-600", else: "text-yellow-600")
     ]}>
       <%= if page.translated? do %>
@@ -33,10 +30,13 @@
         untranslated
       <% end %>
     </span>
-    <.link navigate={~p"/audio/#{@story}/#{page.number}"} class="text-purple-600 hover:underline">
+    <.link
+      navigate={~p"/audio/#{@story}/#{page.number}"}
+      class="ml-2 text-purple-600 hover:underline"
+    >
       Practice Audio
     </.link>
-    <.action_menu id={"page-menu-#{page.number}"}>
+    <.action_menu id={"page-menu-#{page.number}"} class="ml-2">
       <:item phx-click="edit_page" phx-value-number={page.number}>
         Edit
       </:item>
