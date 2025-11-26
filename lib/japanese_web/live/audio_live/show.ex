@@ -1,7 +1,7 @@
 defmodule JapaneseWeb.AudioLive.Show do
   use JapaneseWeb, :live_view
 
-  alias Japanese.Corpus.{Audio, Page, Story}
+  alias Japanese.Corpus.{Audio, Story}
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do

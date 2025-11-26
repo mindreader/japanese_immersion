@@ -13,31 +13,30 @@
     <.link navigate={~p"/stories/#{story}"} class="text-blue-600 hover:underline">
       {story.name}
     </.link>
-    <.link patch={~p"/stories/#{story}/edit"} class="ml-2 text-green-600 hover:underline">
-      Edit
-    </.link>
-    <button
-      :if={!Map.has_key?(@generating_story_audio, story.name)}
-      phx-click="show_story_voice_selection"
-      phx-value-story={story.name}
-      class="ml-2 text-blue-600 hover:underline"
-      type="button"
-    >
-      Generate Audio
-    </button>
-    <span :if={Map.has_key?(@generating_story_audio, story.name)} class="ml-2 text-gray-500">
-      Generating...
-    </span>
     <.link navigate={~p"/audio/#{story}"} class="ml-2 text-purple-600 hover:underline">
       Practice Audio
     </.link>
-    <.link
-      phx-click={JS.push("delete", value: %{id: story.name}) |> hide("##{id}")}
-      data-confirm="Are you sure?"
-      class="ml-2 text-red-600 hover:underline"
-    >
-      Delete
-    </.link>
+    <.action_menu id={"story-menu-#{story.name}"} class="ml-2">
+      <:item patch={~p"/stories/#{story}/edit"}>
+        Edit
+      </:item>
+      <:item
+        phx-click="show_story_voice_selection"
+        phx-value-story={story.name}
+        disabled={Map.has_key?(@generating_story_audio, story.name)}
+      >
+        {if Map.has_key?(@generating_story_audio, story.name),
+          do: "Generating...",
+          else: "Generate Audio"}
+      </:item>
+      <:item
+        phx-click={JS.push("delete", value: %{id: story.name}) |> hide("##{id}")}
+        data-confirm="Are you sure?"
+        class="text-red-600"
+      >
+        Delete
+      </:item>
+    </.action_menu>
   </li>
 </ul>
 

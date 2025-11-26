@@ -29,9 +29,10 @@ defmodule JapaneseWeb.StoryLive.IndexTest do
     Mimic.expect(Story, :delete, fn ^story -> :ok end)
     {:ok, view, html} = live(conn, ~p"/stories")
     assert html =~ "story1"
-    # Simulate clicking the Delete link for story1
+
+    # Click the Delete button inside the menu (tests can access hidden elements)
     view
-    |> element(~s{a[data-confirm][phx-click][href="#"]:fl-contains('Delete')})
+    |> element(~s{button[data-confirm]:fl-contains('Delete')})
     |> render_click(%{"id" => "story1"})
 
     refute render(view) =~ "story1"

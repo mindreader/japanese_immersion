@@ -597,6 +597,108 @@ defmodule JapaneseWeb.CoreComponents do
     """
   end
 
+  @doc """
+  Renders a dropdown action menu.
+
+  ## Examples
+
+      <.action_menu id="story-menu">
+        <:item navigate={~p"/edit"}>Edit</:item>
+        <:item phx-click="delete" class="text-red-600">Delete</:item>
+      </.action_menu>
+
+      <.action_menu id="page-menu">
+        <:item patch={~p"/edit"}>Edit</:item>
+        <:item phx-click="generate" disabled={@generating}>Generate Audio</:item>
+      </.action_menu>
+  """
+  attr :id, :string, required: true
+  attr :class, :string, default: nil
+
+  slot :item, doc: "menu items" do
+    attr :navigate, :string, doc: "phoenix route to navigate to"
+    attr :patch, :string, doc: "phoenix route to patch to"
+    attr :disabled, :boolean, doc: "whether the item is disabled"
+    attr :class, :string, doc: "additional CSS classes"
+    attr :"phx-click", :any, doc: "phoenix click event handler"
+    attr :"phx-value-story", :string, doc: "phoenix value for story parameter"
+    attr :"phx-value-number", :any, doc: "phoenix value for number parameter"
+    attr :"phx-value-page_number", :any, doc: "phoenix value for page_number parameter"
+    attr :"data-confirm", :string, doc: "confirmation message for dangerous actions"
+  end
+
+  def action_menu(assigns) do
+    ~H"""
+    <div class={["relative inline-block", @class]}>
+      <button
+        type="button"
+        phx-click={show("##{@id}-menu")}
+        class="p-1 text-zinc-500 hover:text-zinc-700 focus:outline-none"
+        aria-label="Actions"
+      >
+        <.icon name="hero-cog-6-tooth" class="h-5 w-5" />
+      </button>
+
+      <div
+        id={"#{@id}-menu"}
+        phx-click-away={hide("##{@id}-menu")}
+        class="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg ring-1 ring-zinc-900/10 hidden z-50"
+      >
+        <div class="py-1" role="menu">
+          <.link
+            :for={item <- @item}
+            :if={item[:navigate] && !item[:disabled]}
+            navigate={item[:navigate]}
+            class={[
+              "block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50",
+              item[:class]
+            ]}
+            role="menuitem"
+          >
+            {render_slot(item)}
+          </.link>
+
+          <.link
+            :for={item <- @item}
+            :if={item[:patch] && !item[:disabled]}
+            patch={item[:patch]}
+            class={[
+              "block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50",
+              item[:class]
+            ]}
+            role="menuitem"
+          >
+            {render_slot(item)}
+          </.link>
+
+          <button
+            :for={item <- @item}
+            :if={!item[:navigate] && !item[:patch] && !item[:disabled]}
+            type="button"
+            class={[
+              "block w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50",
+              item[:class]
+            ]}
+            role="menuitem"
+            {Map.drop(item, [:__slot__, :inner_block, :navigate, :patch, :disabled, :class])}
+          >
+            {render_slot(item)}
+          </button>
+
+          <div
+            :for={item <- @item}
+            :if={item[:disabled]}
+            class="block px-4 py-2 text-sm text-zinc-400 cursor-not-allowed"
+            role="menuitem"
+          >
+            {render_slot(item)}
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   ## JS Commands
 
   def show(js \\ %JS{}, selector) do

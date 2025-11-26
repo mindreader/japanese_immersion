@@ -30,35 +30,29 @@
         untranslated
       <% end %>
     </span>
-    <button
-      phx-click="edit_page"
-      phx-value-number={page.number}
-      class="ml-2 text-green-600 hover:underline"
+    <.link
+      navigate={~p"/audio/#{@story}/#{page.number}"}
+      class="ml-2 text-purple-600 hover:underline"
     >
-      Edit
-    </button>
-    <button
-      :if={!Map.has_key?(@generating_page_audio, page.number)}
-      phx-click="show_page_voice_selection"
-      phx-value-page_number={page.number}
-      class="ml-2 text-blue-600 hover:underline"
-      type="button"
-    >
-      Generate Audio
-    </button>
-    <span :if={Map.has_key?(@generating_page_audio, page.number)} class="ml-2 text-gray-500">
-      Generating...
-    </span>
-    <.link navigate={~p"/audio/#{@story}/#{page.number}"} class="ml-2 text-purple-600 hover:underline">
       Practice Audio
     </.link>
-    <button
-      phx-click="delete_page"
-      phx-value-number={page.number}
-      class="ml-2 text-red-600 hover:underline"
-    >
-      Delete
-    </button>
+    <.action_menu id={"page-menu-#{page.number}"} class="ml-2">
+      <:item phx-click="edit_page" phx-value-number={page.number}>
+        Edit
+      </:item>
+      <:item
+        phx-click="show_page_voice_selection"
+        phx-value-page_number={page.number}
+        disabled={Map.has_key?(@generating_page_audio, page.number)}
+      >
+        {if Map.has_key?(@generating_page_audio, page.number),
+          do: "Generating...",
+          else: "Generate Audio"}
+      </:item>
+      <:item phx-click="delete_page" phx-value-number={page.number} class="text-red-600">
+        Delete
+      </:item>
+    </.action_menu>
     <!-- TODO: show created_at, modified_at, size, etc. -->
   </li>
 </ul>

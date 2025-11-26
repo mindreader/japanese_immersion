@@ -65,6 +65,7 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     Mimic.expect(Story, :get_by_name, 1, fn ^story_name -> {:ok, story} end)
     Mimic.expect(Story, :list_pages, 1, fn ^story -> [page] end)
 
+    # Click Edit button (tests can access hidden elements)
     view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
     assert render(view) =~ old_text
 
@@ -94,6 +95,8 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     # Mock delete and list_pages after deletion
     Mimic.expect(Japanese.Corpus.Page, :delete, 1, fn ^page -> :ok end)
     Mimic.expect(Story, :list_pages, 1, fn ^story -> [] end)
+
+    # Click Delete button (tests can access hidden elements)
     view |> element("button", "Delete") |> render_click(%{"number" => "1"})
     assert render(view) =~ "Pages"
     refute render(view) =~ "Page #1"
@@ -130,6 +133,8 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     Mimic.expect(Story, :list_pages, 2, fn ^story -> [page] end)
     {:ok, view, _html} = live(conn, ~p"/stories/#{story}")
     Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, 1, fn ^page -> {:ok, old_text} end)
+
+    # Click Edit button (tests can access hidden elements)
     view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
     assert render(view) =~ "#edit-page-modal"
   end
@@ -146,6 +151,8 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
 
     # Open edit modal
     Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, 1, fn ^page -> {:ok, old_text} end)
+
+    # Click Edit button (tests can access hidden elements)
     view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
     assert render(view) =~ old_text
 

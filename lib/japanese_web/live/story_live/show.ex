@@ -160,6 +160,51 @@ defmodule JapaneseWeb.StoryLive.Show do
   end
 
   @impl Phoenix.LiveView
+  def handle_event("show_page_voice_selection", %{"page_number" => number_str}, socket) do
+    case Integer.parse(number_str) do
+      {page_number, ""} ->
+        {:noreply, assign(socket, :voice_selection_page, page_number)}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid page number")}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event(
+        "generate_page_audio",
+        %{"page_number" => number_str, "voice" => voice_str},
+        socket
+      ) do
+    with {page_number, ""} <- Integer.parse(number_str),
+         page when not is_nil(page) <-
+           Enum.find(socket.assigns.pages, &(&1.number == page_number)) do
+      voice = String.to_existing_atom(voice_str)
+
+      task =
+        Task.async(fn ->
+          Japanese.Corpus.Audio.generate_for_page(page, voice, skip_existing: true)
+        end)
+
+      {:noreply,
+       socket
+       |> assign(
+         :generating_page_audio,
+         Map.put(socket.assigns.generating_page_audio, page_number, task.ref)
+       )
+       |> assign(:voice_selection_page, nil)}
+    else
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not find page for audio generation")}
+    end
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("close_page_voice_modal", _params, socket) do
+    {:noreply, assign(socket, :voice_selection_page, nil)}
+  end
+
+  @impl Phoenix.LiveView
   def handle_info({:pages_updated, %{story: story_name}}, socket) do
     # Only reload if this is the current story
     if socket.assigns[:story] && socket.assigns.story.name == story_name do
@@ -240,51 +285,6 @@ defmodule JapaneseWeb.StoryLive.Show do
     else
       {:noreply, socket}
     end
-  end
-
-  @impl Phoenix.LiveView
-  def handle_event("show_page_voice_selection", %{"page_number" => number_str}, socket) do
-    case Integer.parse(number_str) do
-      {page_number, ""} ->
-        {:noreply, assign(socket, :voice_selection_page, page_number)}
-
-      _ ->
-        {:noreply, put_flash(socket, :error, "Invalid page number")}
-    end
-  end
-
-  @impl Phoenix.LiveView
-  def handle_event(
-        "generate_page_audio",
-        %{"page_number" => number_str, "voice" => voice_str},
-        socket
-      ) do
-    with {page_number, ""} <- Integer.parse(number_str),
-         page when not is_nil(page) <-
-           Enum.find(socket.assigns.pages, &(&1.number == page_number)) do
-      voice = String.to_existing_atom(voice_str)
-
-      task =
-        Task.async(fn ->
-          Japanese.Corpus.Audio.generate_for_page(page, voice, skip_existing: true)
-        end)
-
-      {:noreply,
-       socket
-       |> assign(
-         :generating_page_audio,
-         Map.put(socket.assigns.generating_page_audio, page_number, task.ref)
-       )
-       |> assign(:voice_selection_page, nil)}
-    else
-      _ ->
-        {:noreply, put_flash(socket, :error, "Could not find page for audio generation")}
-    end
-  end
-
-  @impl Phoenix.LiveView
-  def handle_event("close_page_voice_modal", _params, socket) do
-    {:noreply, assign(socket, :voice_selection_page, nil)}
   end
 
   defp page_title(:show), do: "Show Story"
