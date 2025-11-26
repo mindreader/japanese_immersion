@@ -49,6 +49,9 @@
     <span :if={Map.has_key?(@generating_page_audio, page.number)} class="ml-2 text-gray-500">
       Generating...
     </span>
+    <.link navigate={~p"/audio/#{@story}/#{page.number}"} class="ml-2 text-purple-600 hover:underline">
+      Practice Audio
+    </.link>
     <button
       phx-click="delete_page"
       phx-value-number={page.number}

@@ -28,6 +28,9 @@
     <span :if={Map.has_key?(@generating_story_audio, story.name)} class="ml-2 text-gray-500">
       Generating...
     </span>
+    <.link navigate={~p"/audio/#{story}"} class="ml-2 text-purple-600 hover:underline">
+      Practice Audio
+    </.link>
     <.link
       phx-click={JS.push("delete", value: %{id: story.name}) |> hide("##{id}")}
       data-confirm="Are you sure?"
