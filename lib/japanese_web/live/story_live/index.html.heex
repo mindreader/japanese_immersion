@@ -9,14 +9,18 @@
 
 <h3 class="mt-8 text-lg font-semibold">Stories</h3>
 <ul id="stories" phx-update="stream">
-  <li :for={{id, story} <- @streams.stories} id={id} class="flex items-center gap-4 py-1">
+  <li
+    :for={{id, story} <- @streams.stories}
+    id={id}
+    class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-4 py-1"
+  >
     <.link navigate={~p"/stories/#{story}"} class="text-blue-600 hover:underline">
       {story.name}
     </.link>
-    <.link navigate={~p"/audio/#{story}"} class="ml-2 text-purple-600 hover:underline">
+    <.link navigate={~p"/audio/#{story}"} class="text-purple-600 hover:underline">
       Practice Audio
     </.link>
-    <.action_menu id={"story-menu-#{story.name}"} class="ml-2">
+    <.action_menu id={"story-menu-#{story.name}"}>
       <:item patch={~p"/stories/#{story}/edit"}>
         Edit
       </:item>
