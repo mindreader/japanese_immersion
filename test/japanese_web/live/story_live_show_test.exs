@@ -69,9 +69,8 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     view |> element(~s{button[phx-click="edit_page"][phx-value-number="1"]}) |> render_click()
     assert render(view) =~ old_text
 
-    # Mock update and translation
+    # Mock update (translation happens internally)
     Mimic.expect(Japanese.Corpus.Page, :update_japanese_text, 1, fn ^page, ^new_text -> :ok end)
-    Mimic.expect(Japanese.Translation.Service, :translate_page, 1, fn ^page -> :ok end)
 
     # After update, list_pages returns updated page
     updated_page = %Japanese.Corpus.Page{page | translated?: false}

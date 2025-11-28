@@ -140,7 +140,6 @@ defmodule JapaneseWeb.StoryLive.Show do
     else
       case Japanese.Corpus.Page.update_japanese_text(page, text) do
         :ok ->
-          Japanese.Translation.Service.translate_page(page)
           pages = Story.list_pages(socket.assigns.story)
 
           {:noreply,
