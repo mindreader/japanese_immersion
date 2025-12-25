@@ -7,6 +7,8 @@ defmodule Japanese.Translation do
     - :usage (the usage struct)
   """
 
+  require Logger
+
   @model "claude-sonnet-4-5-20250929"
 
   @type ja_to_en_opts :: [
@@ -207,7 +209,8 @@ defmodule Japanese.Translation do
       messages: [
         %{role: "user", content: user_text}
       ],
-      system: system_prompt
+      system: system_prompt,
+      max_tokens: 16_384
     )
     |> case do
       {:ok, anthropix_result} ->
@@ -225,14 +228,46 @@ defmodule Japanese.Translation do
     end
   end
 
-  defp handle_response({:ok, %{content: [%{text: text} | _], usage: usage}}, :ja_to_en),
-    do: %__MODULE__{text: text, usage: usage}
+  defp check_stop_reason("end_turn", _response, _operation), do: :ok
+  defp check_stop_reason(nil, _response, _operation), do: :ok
 
-  defp handle_response({:ok, %{content: [%{text: text} | _]}}, :en_to_ja) when is_binary(text),
-    do: %{text: text}
+  defp check_stop_reason(stop_reason, response, operation) do
+    Logger.warning("""
+    Translation stopped without finishing naturally.
+    Operation: #{operation}
+    Stop reason: #{stop_reason}
+    Model: #{response.model}
+    Usage: #{inspect(response.usage)}
+    Text length: #{String.length(List.first(response.content).text)} characters
+    """)
+  end
 
-  defp handle_response({:ok, %{content: [%{text: text} | _]}}, :explain) when is_binary(text),
-    do: text
+  defp handle_response(
+         {:ok,
+          %{content: [%{text: text} | _], usage: usage, stop_reason: stop_reason} = response},
+         :ja_to_en
+       ) do
+    check_stop_reason(stop_reason, response, :ja_to_en)
+    %__MODULE__{text: text, usage: usage}
+  end
+
+  defp handle_response(
+         {:ok, %{content: [%{text: text} | _], stop_reason: stop_reason} = response},
+         :en_to_ja
+       )
+       when is_binary(text) do
+    check_stop_reason(stop_reason, response, :en_to_ja)
+    %{text: text}
+  end
+
+  defp handle_response(
+         {:ok, %{content: [%{text: text} | _], stop_reason: stop_reason} = response},
+         :explain
+       )
+       when is_binary(text) do
+    check_stop_reason(stop_reason, response, :explain)
+    text
+  end
 
   defp handle_response({:ok, %{content: []}}, _),
     do: {:error, :no_content}
