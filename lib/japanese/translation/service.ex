@@ -61,7 +61,7 @@ defmodule Japanese.Translation.Service do
     config = config()
 
     case config[:timeout_ms] do
-      nil -> 120 |> :timer.seconds()
+      nil -> 600 |> :timer.seconds()
       other -> other
     end
   end
