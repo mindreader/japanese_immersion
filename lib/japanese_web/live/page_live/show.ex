@@ -10,7 +10,8 @@ defmodule JapaneseWeb.PageLive.Show do
        selected_text: nil,
        explaining: false,
        explanation: nil,
-       explain_task_ref: nil
+       explain_task_ref: nil,
+       translation_status: nil
      )}
   end
 
@@ -37,7 +38,12 @@ defmodule JapaneseWeb.PageLive.Show do
           _ -> nil
         end
 
-      socket = assign(socket, :translation, translation)
+      translation_status = Japanese.Translation.Service.get_status(page)
+
+      socket =
+        socket
+        |> assign(:translation, translation)
+        |> assign(:translation_status, translation_status)
 
       {:noreply, socket}
     else
@@ -62,6 +68,10 @@ defmodule JapaneseWeb.PageLive.Show do
   end
 
   @impl Phoenix.LiveView
+  def handle_info({:translation_started, _payload}, socket) do
+    {:noreply, assign(socket, :translation_status, :in_progress)}
+  end
+
   def handle_info({:translation_finished, %{story: story, page: page_number}}, socket) do
     # Refetch story and page, then update assigns
     with {:ok, story} <- Japanese.Corpus.Story.get_by_name(story),
@@ -77,12 +87,17 @@ defmodule JapaneseWeb.PageLive.Show do
         |> assign(:story, story)
         |> assign(:page, page)
         |> assign(:translation, translation)
+        |> assign(:translation_status, nil)
 
       {:noreply, socket}
     else
       _ ->
         {:noreply, socket}
     end
+  end
+
+  def handle_info({:translation_failed, %{reason: reason}}, socket) do
+    {:noreply, assign(socket, :translation_status, {:error, reason})}
   end
 
   @impl Phoenix.LiveView
@@ -182,5 +197,12 @@ defmodule JapaneseWeb.PageLive.Show do
   @impl Phoenix.LiveView
   def handle_event("close_explanation_modal", _params, socket) do
     {:noreply, assign(socket, :explanation, nil)}
+  end
+
+  def handle_event("retry_translation", _params, socket) do
+    page = socket.assigns.page
+    Japanese.Translation.Service.clear_error(page)
+    Japanese.Translation.Service.translate_page(page)
+    {:noreply, assign(socket, :translation_status, :in_progress)}
   end
 end

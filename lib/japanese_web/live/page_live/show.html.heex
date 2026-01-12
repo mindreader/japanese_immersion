@@ -13,7 +13,43 @@
     phx-hook="ScrollPosition"
     class="flex-1 overflow-y-auto rounded border p-4 bg-white shadow"
   >
-    <.translation id="translation-display" content={@translation} />
+    <%= case @translation_status do %>
+      <% :in_progress -> %>
+        <div class="flex items-center justify-center py-8 text-zinc-600">
+          <svg class="animate-spin h-6 w-6 mr-3" viewBox="0 0 24 24">
+            <circle
+              class="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              stroke-width="4"
+              fill="none"
+            />
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
+          <span>Translating...</span>
+        </div>
+      <% {:error, reason} -> %>
+        <div class="flex flex-col items-center justify-center py-8">
+          <div class="text-red-600 mb-4">
+            Translation failed: {inspect(reason)}
+          </div>
+          <button
+            phx-click="retry_translation"
+            class="rounded bg-blue-600 text-white px-4 py-2 hover:bg-blue-700"
+            type="button"
+          >
+            Retry Translation
+          </button>
+        </div>
+      <% _ -> %>
+        <.translation id="translation-display" content={@translation} />
+    <% end %>
   </div>
   <!-- Action buttons container - vertical on mobile, horizontal on desktop -->
   <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-4 md:flex-row-reverse">
