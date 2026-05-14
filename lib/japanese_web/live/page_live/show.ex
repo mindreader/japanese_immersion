@@ -159,9 +159,7 @@ defmodule JapaneseWeb.PageLive.Show do
   end
 
   @impl Phoenix.LiveView
-  def handle_event("start_explain", _params, socket) do
-    selected_text = socket.assigns.selected_text
-
+  def handle_event("start_explain", %{"text" => selected_text}, socket) do
     # Spawn async task to get explanation from LLM
     task =
       Task.async(fn ->
@@ -176,6 +174,7 @@ defmodule JapaneseWeb.PageLive.Show do
 
     {:noreply,
      socket
+     |> assign(:selected_text, selected_text)
      |> assign(:explaining, true)
      |> assign(:explain_task_ref, task.ref)}
   end

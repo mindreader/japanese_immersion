@@ -62,19 +62,18 @@
       Toggle English
     </button>
     <!-- JPDB button - middle on mobile, center on desktop, hidden for long text -->
-    <a
+    <button
       :if={@selected_text && !@explanation}
-      href={"https://jpdb.io/search?q=#{URI.encode_www_form(@selected_text)}"}
-      target="_blank"
-      rel="noopener noreferrer"
+      id="jpdb-button"
+      type="button"
       class="rounded-full bg-blue-600 text-white px-6 py-3 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition text-center"
     >
       JPDB
-    </a>
+    </button>
     <!-- Explain button - top on mobile, leftmost on desktop -->
     <button
       :if={@selected_text && !@explaining && !@explanation}
-      phx-click="start_explain"
+      id="explain-button"
       class="rounded-full bg-green-600 text-white px-6 py-3 shadow-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 transition"
       type="button"
     >

@@ -27,6 +27,8 @@ let Hooks = {};
 
 Hooks.TextSelection = {
   mounted() {
+    this.selectedText = "";
+
     this.handleSelection = () => {
       const selection = window.getSelection();
       const selectedText = selection.toString().trim();
@@ -40,6 +42,7 @@ Hooks.TextSelection = {
         while (container && container !== this.el) {
           if (container.classList && container.classList.contains('tr-ja')) {
             // We're selecting Japanese text!
+            this.selectedText = selectedText;
             this.pushEvent("text_selected", { text: selectedText });
             return;
           }
@@ -48,11 +51,37 @@ Hooks.TextSelection = {
       }
 
       // If no Japanese text selected, clear selection
+      this.selectedText = "";
       this.pushEvent("clear_selection", {});
+    };
+
+    // Delegated click handler so it works even though the buttons are
+    // rendered conditionally. The cached selection (this.selectedText) is the
+    // source of truth at click time — avoids the race where a server round-trip
+    // hasn't landed yet and the stale @selected_text would otherwise be used.
+    this.handleActionClick = (e) => {
+      const jpdb = e.target.closest('#jpdb-button');
+      const explain = e.target.closest('#explain-button');
+      if (!jpdb && !explain) return;
+
+      e.preventDefault();
+      const text = this.selectedText;
+      if (!text) return;
+
+      if (jpdb) {
+        window.open(
+          `https://jpdb.io/search?q=${encodeURIComponent(text)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
+      } else {
+        this.pushEvent("start_explain", { text });
+      }
     };
 
     this.el.addEventListener('mouseup', this.handleSelection);
     this.el.addEventListener('touchend', this.handleSelection);
+    this.el.addEventListener('click', this.handleActionClick);
 
     // Also clear when clicking elsewhere (but not on modals or buttons)
     document.addEventListener('mousedown', (e) => {
@@ -62,6 +91,7 @@ Hooks.TextSelection = {
                           e.target.closest('button[type="button"]');
 
       if (!this.el.contains(e.target) && !clickedModal) {
+        this.selectedText = "";
         this.pushEvent("clear_selection", {});
       }
     });
@@ -70,6 +100,7 @@ Hooks.TextSelection = {
   destroyed() {
     this.el.removeEventListener('mouseup', this.handleSelection);
     this.el.removeEventListener('touchend', this.handleSelection);
+    this.el.removeEventListener('click', this.handleActionClick);
   }
 };
 
