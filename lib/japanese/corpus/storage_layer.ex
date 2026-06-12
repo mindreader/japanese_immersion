@@ -132,6 +132,39 @@ defmodule Japanese.Corpus.StorageLayer do
   end
 
   @doc """
+  Most recent mtime of any file in the story directory (or of the directory
+  itself). Used to surface recently-edited stories first in the index.
+
+  Walks the immediate children — editing a page updates the page file's mtime
+  but not the parent directory's, so dir mtime alone wouldn't catch edits.
+  Returns nil if the story doesn't exist or can't be read.
+  """
+  @spec story_mtime(t(), String.t()) :: :calendar.datetime() | nil
+  def story_mtime(%__MODULE__{working_directory: wd}, story) do
+    path = Path.join(wd, story)
+
+    file_mtimes =
+      case File.ls(path) do
+        {:ok, files} ->
+          for f <- files, {:ok, %{mtime: m}} <- [File.stat(Path.join(path, f))], do: m
+
+        _ ->
+          []
+      end
+
+    dir_mtime =
+      case File.stat(path) do
+        {:ok, %{mtime: m}} -> [m]
+        _ -> []
+      end
+
+    case file_mtimes ++ dir_mtime do
+      [] -> nil
+      mtimes -> Enum.max(mtimes)
+    end
+  end
+
+  @doc """
   List all page filenames in a given story directory.
   Returns {:ok, [filename]} or {:error, reason}.
   """

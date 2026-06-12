@@ -22,11 +22,21 @@ defmodule Japanese.Corpus do
   """
   @spec list_stories() :: [Story.t()]
   def list_stories() do
-    StorageLayer.new()
-    |> StorageLayer.list_stories()
-    |> case do
+    layer = StorageLayer.new()
+
+    case StorageLayer.list_stories(layer) do
       {:ok, entries} ->
-        Enum.map(entries, fn name -> %Japanese.Corpus.Story{name: name} end)
+        # Sort by most-recently-modified first so the story you're working
+        # on stays at the top of the list. Stories with no readable mtime
+        # sort to the bottom.
+        entries
+        |> Enum.sort_by(
+          fn name ->
+            StorageLayer.story_mtime(layer, name) || {{0, 0, 0}, {0, 0, 0}}
+          end,
+          :desc
+        )
+        |> Enum.map(fn name -> %Japanese.Corpus.Story{name: name} end)
 
       _ ->
         []
