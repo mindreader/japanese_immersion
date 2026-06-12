@@ -500,7 +500,7 @@ let
 
       phoenix =
         let
-          version = "1.7.23";
+          version = "1.8.8";
           drv = buildMix {
             inherit version;
             name = "phoenix";
@@ -509,11 +509,11 @@ let
             src = fetchHex {
               inherit version;
               pkg = "phoenix";
-              sha256 = "98b551a267cbcd0ca4a2bfe05ff2fb3cd68699197a2a3e14504f6b7be758ca9d";
+              sha256 = "f0c843037bd2e7012fc1d1ec9574dfa6972b7e3d09e9b77fd23aa283af0aa994";
             };
 
             beamDeps = [
-              castore
+              bandit
               jason
               phoenix_pubsub
               phoenix_template
@@ -569,7 +569,7 @@ let
 
       phoenix_live_view =
         let
-          version = "1.0.17";
+          version = "1.2.0";
           drv = buildMix {
             inherit version;
             name = "phoenix_live_view";
@@ -578,7 +578,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "phoenix_live_view";
-              sha256 = "a4ca05c1eb6922c4d07a508a75bfa12c45e5f4d8f77ae83283465f02c53741e1";
+              sha256 = "e540d7c98dbb1c9714c204af690a71e389093efe66cdcd1c18764878219e16d7";
             };
 
             beamDeps = [

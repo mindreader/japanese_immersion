@@ -32,7 +32,7 @@ defmodule JapaneseWeb.StoryLive.IndexTest do
 
     # Click the Delete button inside the menu (tests can access hidden elements)
     view
-    |> element(~s{button[data-confirm]:fl-contains('Delete')})
+    |> element("button[data-confirm]", "Delete")
     |> render_click(%{"id" => "story1"})
 
     refute render(view) =~ "story1"
