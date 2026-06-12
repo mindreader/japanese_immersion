@@ -165,7 +165,7 @@ let
 
       bandit =
         let
-          version = "1.7.0";
+          version = "1.12.0";
           drv = buildMix {
             inherit version;
             name = "bandit";
@@ -174,7 +174,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "bandit";
-              sha256 = "3e2f7a98c7a11f48d9d8c037f7177cd39778e74d55c7af06fe6227c742a8168a";
+              sha256 = "45dac82dc86f45cf4a196dee9cc5a8b791d9c9469d996055f055e6ee36c66e20";
             };
 
             beamDeps = [
@@ -207,7 +207,7 @@ let
 
       castore =
         let
-          version = "1.0.14";
+          version = "1.0.19";
           drv = buildMix {
             inherit version;
             name = "castore";
@@ -216,7 +216,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "castore";
-              sha256 = "7bc1b65249d31701393edaaac18ec8398d8974d52c647b7904d01b964137b9f4";
+              sha256 = "3669e6cab13f54c2df26b3e6833745d647f35b6e30d8ddd5975df0d5c842ca98";
             };
           };
         in
@@ -224,7 +224,7 @@ let
 
       decimal =
         let
-          version = "2.3.0";
+          version = "3.1.1";
           drv = buildMix {
             inherit version;
             name = "decimal";
@@ -233,7 +233,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "decimal";
-              sha256 = "a4d66355cb29cb47c3cf30e71329e58361cfcb37c34235ef3bf1d7bf3773aeac";
+              sha256 = "c5f25f2ced74a0587d03e6023f595db8e924c9d3922c8c8ffd9edfc4498cf1f6";
             };
           };
         in
@@ -258,7 +258,7 @@ let
 
       earmark =
         let
-          version = "1.4.48";
+          version = "1.4.49";
           drv = buildMix {
             inherit version;
             name = "earmark";
@@ -267,7 +267,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "earmark";
-              sha256 = "a461a0ddfdc5432381c876af1c86c411fd78a25790c75023c7a4c035fdc858f9";
+              sha256 = "ffad0257b92ac342b236d1744f7f19793da77bbd7281f32ccdfb44c047a05bf2";
             };
           };
         in
@@ -275,7 +275,7 @@ let
 
       ecto =
         let
-          version = "3.13.2";
+          version = "3.14.0";
           drv = buildMix {
             inherit version;
             name = "ecto";
@@ -284,7 +284,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "ecto";
-              sha256 = "669d9291370513ff56e7b7e7081b7af3283d02e046cf3d403053c557894a0b3e";
+              sha256 = "130d69ffb4285f9ce4792b65dfbb994fd13ea4cbc3cbea2524b199aa3de84af3";
             };
 
             beamDeps = [
@@ -406,7 +406,7 @@ let
 
       jason =
         let
-          version = "1.4.4";
+          version = "1.4.5";
           drv = buildMix {
             inherit version;
             name = "jason";
@@ -415,7 +415,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "jason";
-              sha256 = "c5eb0cab91f094599f94d55bc63409236a8ec69a21a67814529e8d5f6cc90b3b";
+              sha256 = "b0c823996102bcd0239b3c2444eb00409b72f6a140c1950bc8b457d836b30684";
             };
 
             beamDeps = [
@@ -444,7 +444,7 @@ let
 
       mint =
         let
-          version = "1.7.1";
+          version = "1.9.0";
           drv = buildMix {
             inherit version;
             name = "mint";
@@ -453,7 +453,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "mint";
-              sha256 = "fceba0a4d0f24301ddee3024ae116df1c3f4bb7a563a731f45fdfeb9d39a231b";
+              sha256 = "007154c7d8c43916aed3c93afd1f11aebbaa9c5ff4b7ba55ebe0d17ee0296042";
             };
 
             beamDeps = [
@@ -500,7 +500,7 @@ let
 
       phoenix =
         let
-          version = "1.7.21";
+          version = "1.7.23";
           drv = buildMix {
             inherit version;
             name = "phoenix";
@@ -509,7 +509,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "phoenix";
-              sha256 = "336dce4f86cba56fed312a7d280bf2282c720abb6074bdb1b61ec8095bdd0bc9";
+              sha256 = "98b551a267cbcd0ca4a2bfe05ff2fb3cd68699197a2a3e14504f6b7be758ca9d";
             };
 
             beamDeps = [
@@ -528,7 +528,7 @@ let
 
       phoenix_html =
         let
-          version = "4.2.1";
+          version = "4.3.0";
           drv = buildMix {
             inherit version;
             name = "phoenix_html";
@@ -537,7 +537,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "phoenix_html";
-              sha256 = "cff108100ae2715dd959ae8f2a8cef8e20b593f8dfd031c9cba92702cf23e053";
+              sha256 = "3eaa290a78bab0f075f791a46a981bbe769d94bc776869f4f3063a14f30497ad";
             };
           };
         in
@@ -595,7 +595,7 @@ let
 
       phoenix_pubsub =
         let
-          version = "2.1.3";
+          version = "2.2.0";
           drv = buildMix {
             inherit version;
             name = "phoenix_pubsub";
@@ -604,7 +604,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "phoenix_pubsub";
-              sha256 = "bba06bc1dcfd8cb086759f0edc94a8ba2bc8896d5331a1e2c2902bf8e36ee502";
+              sha256 = "adc313a5bf7136039f63cfd9668fde73bba0765e0614cba80c06ac9460ff3e96";
             };
           };
         in
@@ -633,7 +633,7 @@ let
 
       plug =
         let
-          version = "1.18.1";
+          version = "1.19.2";
           drv = buildMix {
             inherit version;
             name = "plug";
@@ -642,7 +642,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "plug";
-              sha256 = "57a57db70df2b422b564437d2d33cf8d33cd16339c1edb190cd11b1a3a546cc2";
+              sha256 = "b6fce20a56af5e60fa5dfecf3f907bb98ec981be43c79a3809a499bc3d133de0";
             };
 
             beamDeps = [
@@ -718,7 +718,7 @@ let
 
       telemetry =
         let
-          version = "1.3.0";
+          version = "1.4.2";
           drv = buildRebar3 {
             inherit version;
             name = "telemetry";
@@ -726,7 +726,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "telemetry";
-              sha256 = "7015fc8919dbe63764f4b4b87a95b7c0996bd539e0d499be6ec9d7f3875b79e6";
+              sha256 = "928f6495066506077862c0d1646609eed891a4326bee3126ba54b60af61febb1";
             };
           };
         in
@@ -755,7 +755,7 @@ let
 
       telemetry_poller =
         let
-          version = "1.2.0";
+          version = "1.3.0";
           drv = buildRebar3 {
             inherit version;
             name = "telemetry_poller";
@@ -763,7 +763,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "telemetry_poller";
-              sha256 = "7216e21a6c326eb9aa44328028c34e9fd348fb53667ca837be59d0aa2a0156e8";
+              sha256 = "51f18bed7128544a50f75897db9974436ea9bfba560420b646af27a9a9b35211";
             };
 
             beamDeps = [
@@ -775,7 +775,7 @@ let
 
       tesla =
         let
-          version = "1.15.3";
+          version = "1.20.0";
           drv = buildMix {
             inherit version;
             name = "tesla";
@@ -784,7 +784,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "tesla";
-              sha256 = "98bb3d4558abc67b92fb7be4cd31bb57ca8d80792de26870d362974b58caeda7";
+              sha256 = "3ecb41cb458772332752c3acdfe983e23abb991f5a43cfd69a64e9ea3f4b0061";
             };
 
             beamDeps = [
@@ -801,7 +801,7 @@ let
 
       thousand_island =
         let
-          version = "1.3.14";
+          version = "1.5.0";
           drv = buildMix {
             inherit version;
             name = "thousand_island";
@@ -810,7 +810,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "thousand_island";
-              sha256 = "d0d24a929d31cdd1d7903a4fe7f2409afeedff092d277be604966cd6aa4307ef";
+              sha256 = "708923d40523e43cf99041ab37a0d4b0ec426ac6438fa3716ab23d919eaeb412";
             };
 
             beamDeps = [
@@ -839,7 +839,7 @@ let
 
       websock_adapter =
         let
-          version = "0.5.8";
+          version = "0.5.9";
           drv = buildMix {
             inherit version;
             name = "websock_adapter";
@@ -848,7 +848,7 @@ let
             src = fetchHex {
               inherit version;
               pkg = "websock_adapter";
-              sha256 = "315b9a1865552212b5f35140ad194e67ce31af45bcee443d4ecb96b5fd3f3782";
+              sha256 = "5534d5c9adad3c18a0f58a9371220d75a803bf0b9a3d87e6fe072faaeed76a08";
             };
 
             beamDeps = [
