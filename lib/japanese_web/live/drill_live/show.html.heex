@@ -1,0 +1,127 @@
+<% current = Enum.at(@history, @cursor) %>
+
+<.header>Verb Drill</.header>
+
+<div id="drill-container" class="relative flex flex-col h-[70vh] mt-8">
+  <div class="flex-1 overflow-y-auto rounded border p-4 bg-white shadow space-y-6">
+    <!-- Prompt -->
+    <div class="text-center py-10">
+      <p class="text-5xl font-bold tracking-wide">{current.prompt}</p>
+    </div>
+
+    <%= if @revealed do %>
+      <div class="space-y-5 border-t border-zinc-200 pt-5">
+        <!-- Kanji form -->
+        <div class="text-center text-2xl text-zinc-800">{current.kanji}</div>
+        <%= if current.verb.frequency do %>
+          <div class="text-center text-xs text-zinc-400">JPDB rank #{current.verb.frequency}</div>
+        <% end %>
+        
+<!-- Form name with on-demand description -->
+        <details class="text-sm text-zinc-700">
+          <summary class="cursor-pointer font-semibold text-zinc-900">
+            {current.help.label}
+            <span class="ml-2 text-zinc-400">(?)</span>
+          </summary>
+          <div class="mt-2 pl-4 space-y-1 text-zinc-600">
+            <p>{current.help.description}</p>
+            <p class="italic">{current.help.example}</p>
+          </div>
+        </details>
+        
+<!-- Could-be list -->
+        <div class="text-sm">
+          <p class="font-semibold mb-2 text-zinc-900">Could be:</p>
+          <ul class="space-y-1">
+            <%= for {verb, form} <- current.matches do %>
+              <li class="leading-relaxed">
+                <span class="font-medium text-zinc-900">
+                  <%= if verb.kanji do %>
+                    {verb.kanji} / {verb.kana}
+                  <% else %>
+                    {verb.kana}
+                  <% end %>
+                </span>
+                <span class="text-zinc-600">— {verb.english}</span>
+                <span class="text-zinc-400">
+                  ({verb.class}, {Japanese.Drill.Conjugator.label(form)})
+                </span>
+                <%= if verb.frequency do %>
+                  <span class="text-zinc-400 ml-1">#{verb.frequency}</span>
+                <% end %>
+              </li>
+            <% end %>
+          </ul>
+        </div>
+        
+<!-- Explain (on-demand LLM) -->
+        <div class="pt-4 border-t border-zinc-200">
+          <%= cond do %>
+            <% @explanation -> %>
+              <div class="markdown-content text-sm text-zinc-700 leading-relaxed space-y-2">
+                {Phoenix.HTML.raw(@explanation)}
+              </div>
+            <% @explaining -> %>
+              <div class="flex items-center text-sm text-zinc-600">
+                <svg class="animate-spin h-4 w-4 mr-2" viewBox="0 0 24 24">
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="4"
+                    fill="none"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Generating explanation...
+                <button
+                  phx-click="cancel_explain"
+                  class="ml-4 text-orange-600 underline"
+                  type="button"
+                >
+                  cancel
+                </button>
+              </div>
+            <% true -> %>
+              <button
+                phx-click="start_explain"
+                class="text-sm text-blue-600 hover:text-blue-800 underline"
+                type="button"
+              >
+                Explain this verb in this form
+              </button>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+  
+<!-- Floating action buttons, matching page_live pattern -->
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col-reverse gap-4 md:flex-row-reverse">
+    <button
+      phx-click={if @revealed, do: "next", else: "reveal"}
+      class="rounded-full bg-zinc-900 text-white px-6 py-3 shadow-lg hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+      type="button"
+    >
+      {if @revealed, do: "Next", else: "Show answer"}
+    </button>
+
+    <%= if @cursor > 0 do %>
+      <button
+        phx-click="back"
+        class="rounded-full bg-zinc-500 text-white px-6 py-3 shadow-lg hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-zinc-400 transition"
+        type="button"
+      >
+        Back
+      </button>
+    <% end %>
+  </div>
+</div>
+
+<.back navigate={~p"/stories"}>Back to stories</.back>

@@ -117,6 +117,46 @@ defmodule Japanese.Translation do
   end
 
   @doc """
+  Explains a single conjugated verb form for the drill mode.
+
+  Takes a context map describing the verb and the form, and returns a brief
+  on-demand explanation. Designed to be short — only what the learner can't
+  already see in the UI.
+  """
+  @spec explain_form(map()) :: String.t() | {:error, term()}
+  def explain_form(ctx) when is_map(ctx) do
+    system_prompt = """
+    You are helping an intermediate Japanese learner who is drilling verb
+    conjugations. They've been shown one conjugated form with its name and a
+    short generic description. Now they want a short, focused note about
+    this particular verb in this particular form.
+
+    Keep it under 4 sentences. Be concrete. Cover whichever of these are
+    relevant — skip what isn't:
+
+    - Is this form rare, awkward, archaic, or unusual when applied to this
+      verb? If so, say so plainly and suggest the form a native speaker
+      would actually use.
+    - Is the meaning quirky or non-obvious for this specific verb?
+    - One short natural example sentence using this exact conjugation.
+
+    Do NOT repeat the form name or the generic description (the learner
+    already sees those). Do NOT lecture. Do NOT use headers or bullet lists.
+    Plain prose, tight.
+    """
+
+    user = """
+    Verb (dictionary form): #{ctx.verb_kanji || ctx.verb_kana} (#{ctx.verb_kana}) — "#{ctx.verb_english}"
+    Verb class: #{ctx.verb_class}
+    Form name (already shown to learner): #{ctx.form_label}
+    Conjugated form: #{ctx.conjugated_kanji} (#{ctx.conjugated_kana})
+    """
+
+    call_anthropix(system_prompt, user)
+    |> handle_response(:explain)
+  end
+
+  @doc """
   Translates the japanese page synchronously. This can often take some time...
 
   If you want to translate a page asynchronously, use the `Japanese.Translation.Service` module.
