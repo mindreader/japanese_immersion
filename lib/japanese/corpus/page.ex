@@ -6,7 +6,6 @@ defmodule Japanese.Corpus.Page do
   - :translated? — whether the page has been translated (boolean)
   """
 
-  require Logger
   alias Japanese.Corpus.StorageLayer
 
   @type t :: %__MODULE__{

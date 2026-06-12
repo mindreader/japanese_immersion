@@ -9,7 +9,6 @@ defmodule JapaneseWeb.DrillLive.Show do
   """
 
   use JapaneseWeb, :live_view
-  require Logger
 
   alias Japanese.Drill
 

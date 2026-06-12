@@ -222,27 +222,6 @@ let
         in
         drv;
 
-      db_connection =
-        let
-          version = "2.8.0";
-          drv = buildMix {
-            inherit version;
-            name = "db_connection";
-            appConfigPath = ./config;
-
-            src = fetchHex {
-              inherit version;
-              pkg = "db_connection";
-              sha256 = "008399dae5eee1bf5caa6e86d204dcb44242c82b1ed5e22c881f2c34da201b15";
-            };
-
-            beamDeps = [
-              telemetry
-            ];
-          };
-        in
-        drv;
-
       decimal =
         let
           version = "2.3.0";
@@ -311,30 +290,6 @@ let
             beamDeps = [
               decimal
               jason
-              telemetry
-            ];
-          };
-        in
-        drv;
-
-      ecto_sql =
-        let
-          version = "3.13.2";
-          drv = buildMix {
-            inherit version;
-            name = "ecto_sql";
-            appConfigPath = ./config;
-
-            src = fetchHex {
-              inherit version;
-              pkg = "ecto_sql";
-              sha256 = "539274ab0ecf1a0078a6a72ef3465629e4d6018a3028095dc90f60a19c371717";
-            };
-
-            beamDeps = [
-              db_connection
-              ecto
-              postgrex
               telemetry
             ];
           };
@@ -571,30 +526,6 @@ let
         in
         drv;
 
-      phoenix_ecto =
-        let
-          version = "4.6.5";
-          drv = buildMix {
-            inherit version;
-            name = "phoenix_ecto";
-            appConfigPath = ./config;
-
-            src = fetchHex {
-              inherit version;
-              pkg = "phoenix_ecto";
-              sha256 = "26ec3208eef407f31b748cadd044045c6fd485fbff168e35963d2f9dfff28d4b";
-            };
-
-            beamDeps = [
-              ecto
-              phoenix_html
-              plug
-              postgrex
-            ];
-          };
-        in
-        drv;
-
       phoenix_html =
         let
           version = "4.2.1";
@@ -740,29 +671,6 @@ let
         in
         drv;
 
-      postgrex =
-        let
-          version = "0.20.0";
-          drv = buildMix {
-            inherit version;
-            name = "postgrex";
-            appConfigPath = ./config;
-
-            src = fetchHex {
-              inherit version;
-              pkg = "postgrex";
-              sha256 = "d36ef8b36f323d29505314f704e21a1a038e2dc387c6409ee0cd24144e187c0f";
-            };
-
-            beamDeps = [
-              db_connection
-              decimal
-              jason
-            ];
-          };
-        in
-        drv;
-
       req =
         let
           version = "0.5.14";
@@ -782,33 +690,6 @@ let
               jason
               mime
               plug
-            ];
-          };
-        in
-        drv;
-
-      swoosh =
-        let
-          version = "1.19.3";
-          drv = buildMix {
-            inherit version;
-            name = "swoosh";
-            appConfigPath = ./config;
-
-            src = fetchHex {
-              inherit version;
-              pkg = "swoosh";
-              sha256 = "04a10f8496786b744b84130e3510eb53ca51e769c39511b65023bdf4136b732f";
-            };
-
-            beamDeps = [
-              bandit
-              finch
-              jason
-              mime
-              plug
-              req
-              telemetry
             ];
           };
         in

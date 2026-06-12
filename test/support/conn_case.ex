@@ -31,9 +31,7 @@ defmodule JapaneseWeb.ConnCase do
     end
   end
 
-  setup tags do
-    # Uncommented and fixed: always provide a built conn
-    Japanese.DataCase.setup_sandbox(tags)
+  setup _tags do
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

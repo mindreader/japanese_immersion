@@ -9,10 +9,8 @@ defmodule Japanese.Application do
   def start(_type, _args) do
     children = [
       JapaneseWeb.Telemetry,
-      # Japanese.Repo,
       {DNSCluster, query: Application.get_env(:japanese, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Japanese.PubSub},
-      # Start the Finch HTTP client for sending emails
       {Finch, name: Japanese.Finch},
       {Task.Supervisor, name: Japanese.Task.Supervisor},
       {Japanese.Translation.Service.Server, name: Japanese.Translation.Service},
