@@ -50,8 +50,23 @@ defmodule Japanese.Drill do
       form: form,
       kanji: kanji,
       help: Conjugator.help(form),
-      matches: matches_for(kana)
+      matches: matches_for(kana),
+      all_conjugations: all_conjugations(verb)
     }
+  end
+
+  # Build the full grouped conjugation table for one verb. Returns a list of
+  # `{group_name, [%{form, label, kanji, kana}]}` tuples in presentation order.
+  defp all_conjugations(verb) do
+    for {group_name, forms} <- Conjugator.presentation_groups() do
+      rows =
+        for f <- forms do
+          {k, h} = Conjugator.conjugate(verb, f)
+          %{form: f, label: Conjugator.label(f), kanji: k, kana: h}
+        end
+
+      {group_name, rows}
+    end
   end
 
   @doc """

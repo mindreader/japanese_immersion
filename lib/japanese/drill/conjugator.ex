@@ -209,6 +209,33 @@ defmodule Japanese.Drill.Conjugator do
   @spec help(atom()) :: %{label: String.t(), description: String.t(), example: String.t()}
   def help(form), do: Keyword.fetch!(@forms_meta, form)
 
+  # Pedagogical ordering for the "all conjugations" reveal panel — groups
+  # related forms together so the learner can compare nearby. Forms appearing
+  # earlier in a group are the canonical/most-common variant; tightly-coupled
+  # pairs (passive vs causative-passive, te-shimau vs te-shimatta) sit next
+  # to each other within a group.
+  @presentation_groups [
+    {"Basic", [:plain, :past, :negative, :past_negative, :te]},
+    {"Polite", [:polite, :polite_negative, :polite_past, :polite_past_negative]},
+    {"Modal", [:potential, :conditional_eba, :conditional_tara, :volitional, :tai]},
+    {"〜ている", [:te_iru, :te_iru_past, :te_iru_negative, :te_imasu, :te_imasen]},
+    {"Passive / Causative",
+     [
+       :passive,
+       :passive_past,
+       :passive_polite,
+       :causative,
+       :causative_past,
+       :causative_passive,
+       :causative_passive_past
+     ]},
+    {"〜てしまう", [:te_shimau, :te_shimatta]},
+    {"Imperative / Prohibitive", [:imperative, :polite_imperative, :prohibitive]}
+  ]
+
+  @spec presentation_groups() :: [{String.t(), [atom()]}]
+  def presentation_groups, do: @presentation_groups
+
   ## Auxiliary verbs used by compound forms.
   # いる is conventionally written in kana in ~ている.
   @iru_aux %Verb{kanji: nil, kana: "いる", english: "to be (animate)", class: :ichidan}
