@@ -16,7 +16,9 @@
     removeCookie = false;
 
     mixNixDeps = import ./deps.nix {
-      inherit beamPackages lib pkgs;
+      inherit lib beamPackages;
+      inherit (pkgs) cmake fetchFromGitHub lexbor oniguruma pkg-config vips writeText;
+      extend = lib.id;
     };
 
     japanese-immersion-release = pkgs.beamPackages.mixRelease {
