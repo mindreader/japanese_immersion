@@ -16,8 +16,8 @@
         <%= if current.verb.frequency do %>
           <div class="text-center text-xs text-zinc-400">JPDB rank #{current.verb.frequency}</div>
         <% end %>
-        
-<!-- Form name with on-demand description -->
+
+        <!-- Form name with on-demand description -->
         <details class="text-sm text-zinc-700">
           <summary class="cursor-pointer font-semibold text-zinc-900">
             {current.help.label}
@@ -28,8 +28,8 @@
             <p class="italic">{current.help.example}</p>
           </div>
         </details>
-        
-<!-- Could-be list -->
+
+        <!-- Could-be list -->
         <div class="text-sm">
           <p class="font-semibold mb-2 text-zinc-900">Could be:</p>
           <ul class="space-y-1">
@@ -54,7 +54,7 @@
           </ul>
         </div>
 
-<!-- All conjugations of this verb (default hidden) -->
+        <!-- All conjugations of this verb (default hidden) -->
         <details class="text-sm">
           <summary class="cursor-pointer font-semibold text-zinc-900">
             All conjugations of {current.verb.kanji || current.verb.kana}
@@ -97,8 +97,8 @@
             <% end %>
           </div>
         </details>
-        
-<!-- Explain (on-demand LLM) -->
+
+        <!-- Explain (on-demand LLM) -->
         <div class="pt-4 border-t border-zinc-200">
           <%= cond do %>
             <% @explanation -> %>
@@ -145,8 +145,8 @@
       </div>
     <% end %>
   </div>
-  
-<!-- Floating action buttons, matching page_live pattern -->
+
+  <!-- Floating action buttons, matching page_live pattern -->
   <div class="fixed bottom-6 right-6 z-50 flex flex-col-reverse gap-4 md:flex-row-reverse">
     <button
       phx-click={if @revealed, do: "next", else: "reveal"}
