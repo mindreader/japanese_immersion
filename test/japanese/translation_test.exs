@@ -185,4 +185,70 @@ defmodule Test.Japanese.Translation do
       assert :ok = Translation.translate_page(page)
     end
   end
+
+  describe "translate_page/1 pairing" do
+    @reply_lines [
+      "1\tVisitor ②",
+      "2\t◇◆◇",
+      "!CONTINUED!\t3",
+      "3\tI hear loud voices."
+    ]
+
+    test "numbers the lines it sends and aligns the reply to the source when the model drifts" do
+      story_name = "mystory"
+      page = %Japanese.Corpus.Page{number: 5, story: story_name}
+
+      japanese_text =
+        "来訪者　②\n\n◇◆◇\n\n　大きな声が聞こえてくる。\n\n　そんなことを思いながら私は扉を開けた。\n"
+
+      test_pid = self()
+
+      Mimic.expect(Japanese.Corpus.Page, :get_japanese_text, fn ^page -> {:ok, japanese_text} end)
+
+      Mimic.expect(Japanese.Corpus.Story, :get_by_name, fn ^story_name ->
+        {:ok, %Japanese.Corpus.Story{}}
+      end)
+
+      Mimic.expect(Japanese.Corpus.Page, :update_translation, fn ^page, json ->
+        send(test_pid, {:translation_json, json})
+        :ok
+      end)
+
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        assert [%{role: "user", content: content}] = Keyword.fetch!(opts, :messages)
+
+        assert content ==
+                 "1\t来訪者　②\n\n2\t◇◆◇\n\n3\t大きな声が聞こえてくる。\n\n4\tそんなことを思いながら私は扉を開けた。\n"
+
+        {:ok,
+         %{
+           @anthropix_response_en
+           | "content" => [%{"text" => Enum.join(@reply_lines, "\n"), "type" => "text"}]
+         }}
+      end)
+
+      assert :ok = Translation.translate_page(page)
+      assert_received {:translation_json, json}
+
+      # The model never translated the last line, so that line — and only that
+      # line — is left visibly untranslated.
+      assert Jason.decode!(json)["translation"] == [
+               %{"japanese" => "来訪者　②", "english" => "Visitor ②"},
+               %{"separator" => "◇◆◇"},
+               %{"paragraph_break" => true},
+               %{"japanese" => "大きな声が聞こえてくる。", "english" => "I hear loud voices."},
+               %{"japanese" => "そんなことを思いながら私は扉を開けた。", "english" => nil}
+             ]
+    end
+
+    test "does not number the text for a one-off translation" do
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        assert [%{role: "user", content: "テスト"}] = Keyword.fetch!(opts, :messages)
+
+        {:ok, @anthropix_response_en}
+      end)
+
+      assert %Translation{} = Translation.ja_to_en("テスト", [])
+    end
+  end
 end

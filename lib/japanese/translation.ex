@@ -40,6 +40,7 @@ defmodule Japanese.Translation do
         }
 
   alias Japanese.Schemas.Anthropic.Response
+  alias Japanese.Translation.Json
 
   @enforce_keys [:text]
   defstruct [:text, :usage]
@@ -60,7 +61,7 @@ defmodule Japanese.Translation do
   """
   @spec ja_to_en(String.t(), ja_to_en_opts()) :: t() | {:error, term()}
   def ja_to_en(text, opts \\ []) when is_binary(text) and is_list(opts) do
-    text = cleanup(text)
+    text = text |> cleanup() |> number_lines(Keyword.get(opts, :interleaved, false))
 
     opts
     |> build_ja_to_en_prompt()
@@ -68,6 +69,21 @@ defmodule Japanese.Translation do
     |> handle_response(:ja_to_en)
   end
 
+  # An interleaved translation is pasted back together line by line, so the
+  # lines are numbered and the model is asked to answer by number: pairing
+  # becomes a lookup instead of an inference about ordering.
+  @spec number_lines(String.t(), boolean()) :: String.t()
+  defp number_lines(text, true), do: Json.number_source_lines(text)
+  defp number_lines(text, false), do: text
+
+  @doc """
+  Normalises Japanese page text the way the model will see it.
+
+  Trims each line and squashes runs of three or more blank lines down to two.
+  Pairing anchors against the result rather than the bytes on disk, because this
+  is what was actually sent for translation.
+  """
+  @spec cleanup(String.t()) :: String.t()
   def cleanup(japanese_text) do
     rows = japanese_text |> String.split("\n") |> Enum.map(&String.trim/1)
 
@@ -186,7 +202,13 @@ defmodule Japanese.Translation do
     with {:ok, japanese_text} <- Page.get_japanese_text(page),
          %__MODULE__{text: interleaved_translation} <-
            ja_to_en(japanese_text, interleaved: true) do
-      json = Japanese.Translation.Json.format_to_translation_json(interleaved_translation)
+      # The source text, not the model's echo of it, is what the translation is
+      # aligned against — a line the model drops or alters can then only affect
+      # its own line rather than the parity of the whole page.
+      json =
+        Json.format_to_translation_json(interleaved_translation, japanese_text,
+          label: "#{page.story} page #{page.number}"
+        )
 
       Page.update_translation(page, json)
 
@@ -238,7 +260,6 @@ defmodule Japanese.Translation do
           "Translate this Japanese to English."
       end
 
-    # TODO there is no need to have newlines between each original line and its single translation.
     interleaved_part =
       if interleaved do
         " " <> File.read!(Application.app_dir(:japanese, "priv/translation/interleave.txt"))
