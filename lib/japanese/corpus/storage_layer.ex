@@ -240,7 +240,15 @@ defmodule Japanese.Corpus.StorageLayer do
 
   @doc """
   Delete both the Japanese and English page files for the given story and page number.
-  Returns :ok if both are deleted or do not exist, or {:error, reason} if any error occurs.
+
+  Succeeds (`:ok`) as long as neither file remains afterwards — a file that
+  was already absent is not a failure, since the desired end state (no page
+  files on disk) was reached either way. This holds even if *both* files are
+  already gone: deleting a nonexistent page is idempotent, not an error.
+
+  Genuine filesystem errors (e.g. `:eacces`, `:eperm`) on either file are
+  propagated as `{:error, reason}`, preferring the Japanese file's error if
+  both fail for a reason other than "missing".
   """
   @spec delete_page(t(), String.t(), integer()) :: :ok | {:error, term}
   def delete_page(%__MODULE__{} = storage, story, number) do
@@ -249,14 +257,19 @@ defmodule Japanese.Corpus.StorageLayer do
     jap_result = delete_file(storage, story, jap_file)
     eng_result = delete_file(storage, story, eng_file)
 
-    case {jap_result, eng_result} do
+    case {normalize_delete_result(jap_result), normalize_delete_result(eng_result)} do
       {:ok, :ok} -> :ok
-      {:ok, {:error, :enoent}} -> :ok
-      {{:error, :enoent}, _} -> {:error, :enoent}
       {{:error, reason}, _} -> {:error, reason}
-      {_, {:error, reason}} when reason != :enoent -> {:error, reason}
+      {_, {:error, reason}} -> {:error, reason}
     end
   end
+
+  # A missing file means the delete goal (the file is gone) is already
+  # satisfied, so :enoent is not a failure from delete_page/3's point of view.
+  @spec normalize_delete_result(:ok | {:error, term}) :: :ok | {:error, term}
+  defp normalize_delete_result(:ok), do: :ok
+  defp normalize_delete_result({:error, :enoent}), do: :ok
+  defp normalize_delete_result({:error, reason}), do: {:error, reason}
 
   defp delete_file(%__MODULE__{working_directory: wd}, story, filename) do
     file_path = Path.join([wd, story, filename])
