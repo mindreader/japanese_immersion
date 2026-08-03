@@ -1,39 +1,40 @@
-Interleave the translation with the original text, so that each paragraph has the original japanese, then its english translation. When a scene transition is sensed add a !CONTINUED! marker in between the paragraphs.
+The input text has been split into lines and every non-blank line has been given a line number, written as the number, then a TAB character, then the line itself. Blank lines are not numbered; they only show you where the paragraphs are.
+
+Reply with one line per numbered input line, in exactly this format:
+
+<line number><TAB><English translation of that line>
+
+These rules override any earlier instruction about keeping the input's format:
+
+- Begin each reply line with the line number exactly as it was given, then a single TAB character, then the English translation of that line and nothing else.
+- Do not echo the Japanese back. Do not repeat the numbers in any other form, and do not add quotes, bullets, markdown or commentary.
+- Emit exactly one reply line for every numbered input line, in ascending order. Do not merge two input lines into one reply line, do not split one input line across two reply lines, do not skip a line, and do not invent a line number that was not in the input.
+- A line that is only a separator glyph (for example ◇◆◇, ＊＊＊, ―――, ※ or ……) still gets its own reply line: repeat the glyph as its translation.
+- Do not mark paragraphs or scene transitions in any way; the blank lines of the input already say where they are.
+- Reply with nothing but these lines: no preamble, no summary, no blank lines.
 
 For example, when presented with the following text:
 
-二十年経った私の暮らし　①
+1	二十年経った私の暮らし　①
 
+2	「ふぅ……」
 
-「ふぅ……」
+3	私は家の裏手の畑で、育てている作物の水やりをして一息をつく。
 
+4	私が住んでいる家は、森の中にぽつんと存在している。一人暮らしだが、六部屋もあり十分な広さの平屋だ。レンガ造りの赤い屋根の一軒家。防御魔法も施されていて、滅多なことで壊れることはないだろうと言われている。
 
-　私は家の裏手の畑で、育てている作物の水やりをして一息をつく。
+5	また王都でも有数の大工の手によってつくられた家というのもあって、外面も綺麗で、私はこの家の見た目を気に入っている。
 
-　私が住んでいる家は、森の中にぽつんと存在している。一人暮らしだが、六部屋もあり十分な広さの平屋だ。レンガ造りの赤い屋根の一軒家。防御魔法も施されていて、滅多なことで壊れることはないだろうと言われている。
+6	◇◆◇
 
-　また王都でも有数の大工の手によってつくられた家というのもあって、外面も綺麗で、私はこの家の見た目を気に入っている。
+7	今の私では一から作ってもらおうとしても間違っても作ってもらえないようなとても豪華な家だ。そんな家が森の中に存在しているって何だかアンバランスな感じがするけど、その不釣り合いだけど、何だかバランスが取れている様子も私は気に入っている。
 
-　今の私では一から作ってもらおうとしても間違っても作ってもらえないようなとても豪華な家だ。そんな家が森の中に存在しているって何だかアンバランスな感じがするけど、その不釣り合いだけど、何だかバランスが取れている様子も私は気に入っている。
+You should reply with exactly this and nothing else:
 
-You should translate the text as follows:
-
-二十年経った私の暮らし　①
-Twenty years have passed in my life ①
-
-!CONTINUED!
-
-「ふぅ……」
-"Phew..."
-
-私は家の裏手の畑で、育てている作物の水やりをして一息をつく。
-I take a breather after watering the crops I'm growing in the field behind my house.
-
-私が住んでいる家は、森の中にぽつんと存在している。一人暮らしだが、六部屋もあり十分な広さの平屋だ。レンガ造りの赤い屋根の一軒家。防御魔法も施されていて、滅多なことで壊れることはないだろうと言われている。
-The house I live in exists all alone in the forest. I live alone, but it's a single-story house with six rooms and sufficient space. A brick house with a red roof. Defensive magic has been applied to it, and it's said that it won't break easily under normal circumstances.
-
-また王都でも有数の大工の手によってつくられた家というのもあって、外面も綺麗で、私はこの家の見た目を気に入っている。
-Also, being a house made by one of the royal capital's leading carpenters, the exterior is beautiful, and I like the appearance of this house.
-
-今の私では一から作ってもらおうとしても間違っても作ってもらえないようなとても豪華な家だ。そんな家が森の中に存在しているって何だかアンバランスな感じがするけど、その不釣り合いだけど、何だかバランスが取れている様子も私は気に入っている。
-It's such a luxurious house that even if I tried to have it built from scratch now, I definitely wouldn't be able to get it made. Having such a house exist in the forest feels somehow unbalanced, but I also like how it's mismatched yet somehow balanced.
+1	Twenty years have passed in my life ①
+2	"Phew..."
+3	I take a breather after watering the crops I'm growing in the field behind my house.
+4	The house I live in exists all alone in the forest. I live alone, but it's a single-story house with six rooms and sufficient space. A brick house with a red roof. Defensive magic has been applied to it, and it's said that it won't break easily under normal circumstances.
+5	Also, being a house made by one of the royal capital's leading carpenters, the exterior is beautiful, and I like the appearance of this house.
+6	◇◆◇
+7	It's such a luxurious house that even if I tried to have it built from scratch now, I definitely wouldn't be able to get it made. Having such a house exist in the forest feels somehow unbalanced, but I also like how it's mismatched yet somehow balanced.
