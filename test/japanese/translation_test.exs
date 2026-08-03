@@ -240,9 +240,13 @@ defmodule Test.Japanese.Translation do
              ) == {:ok, "いった"}
     end
 
-    test "caps max_tokens low but well above a single word, since the selection may be a whole line" do
+    test "caps max_tokens well above a single word but keeps it bounded, since the selection may be a whole line" do
       Mimic.expect(Anthropix, :chat, fn _client, opts ->
-        assert Keyword.fetch!(opts, :max_tokens) == 512
+        max_tokens = Keyword.fetch!(opts, :max_tokens)
+        # "猫" is a single character, so this hits the floor rather than the
+        # per-character scaling — still comfortably above what one word needs.
+        assert max_tokens >= 512
+        assert max_tokens <= 4096
 
         {:ok,
          %{
@@ -257,6 +261,60 @@ defmodule Test.Japanese.Translation do
       end)
 
       assert Translation.reading_for("猫", "猫がいる。") == {:ok, "ねこ"}
+    end
+
+    test "scales the token budget up for a long selection instead of pinning one constant" do
+      # ~160 characters — a realistic "whole line" selection that would have
+      # been squeezed by the old fixed 512 ceiling.
+      long_selection = String.duplicate("大変長い文章です", 20)
+
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        max_tokens = Keyword.fetch!(opts, :max_tokens)
+        assert max_tokens > 512
+        assert max_tokens <= 4096
+
+        {:ok,
+         %{
+           "id" => "msg_reading_long",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "stop_reason" => "end_turn",
+           "content" => [%{"type" => "text", "text" => "たいへんながいぶんしょうです"}],
+           "usage" => %{
+             "input_tokens" => 200,
+             "output_tokens" => 40,
+             "service_tier" => "standard"
+           }
+         }}
+      end)
+
+      assert {:ok, _reading} = Translation.reading_for(long_selection, long_selection)
+    end
+
+    test "caps the token budget so a pathologically long selection can't balloon it unboundedly" do
+      huge_selection = String.duplicate("あ", 5000)
+
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        assert Keyword.fetch!(opts, :max_tokens) == 4096
+
+        {:ok,
+         %{
+           "id" => "msg_reading_huge",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "stop_reason" => "end_turn",
+           "content" => [%{"type" => "text", "text" => "ああああ"}],
+           "usage" => %{
+             "input_tokens" => 5000,
+             "output_tokens" => 4096,
+             "service_tier" => "standard"
+           }
+         }}
+      end)
+
+      assert {:ok, _reading} = Translation.reading_for(huge_selection, huge_selection)
     end
 
     test "preserves katakana (loanwords) verbatim instead of forcing hiragana" do
@@ -313,6 +371,62 @@ defmodule Test.Japanese.Translation do
     test "returns error on LLM error" do
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:error, :llm_error} end)
       assert {:error, :llm_error} = Translation.reading_for("猫", "猫がいる。")
+    end
+
+    test "extracts the reading even when a thinking block precedes the text block" do
+      Mimic.expect(Anthropix, :chat, fn _client, _opts ->
+        {:ok,
+         %{
+           "id" => "msg_reading_thinking",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "stop_reason" => "end_turn",
+           "content" => [
+             %{"type" => "thinking", "thinking" => "considering the reading..."},
+             %{"type" => "text", "text" => "べんきょうした"}
+           ],
+           "usage" => %{"input_tokens" => 20, "output_tokens" => 10, "service_tier" => "standard"}
+         }}
+      end)
+
+      assert Translation.reading_for("勉強した", "彼は勉強した。") == {:ok, "べんきょうした"}
+    end
+
+    test "succeeds even when usage omits service_tier, since Anthropic doesn't guarantee it" do
+      Mimic.expect(Anthropix, :chat, fn _client, _opts ->
+        {:ok,
+         %{
+           "id" => "msg_reading_no_tier",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "stop_reason" => "end_turn",
+           "content" => [%{"type" => "text", "text" => "ねこ"}],
+           "usage" => %{"input_tokens" => 5, "output_tokens" => 2}
+         }}
+      end)
+
+      assert Translation.reading_for("猫", "猫がいる。") == {:ok, "ねこ"}
+    end
+
+    test "returns a clean error atom, never a changeset, when no content block has usable text" do
+      Mimic.expect(Anthropix, :chat, fn _client, _opts ->
+        {:ok,
+         %{
+           "id" => "msg_reading_empty",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "stop_reason" => "max_tokens",
+           "content" => [%{"type" => "text", "text" => ""}],
+           "usage" => %{"input_tokens" => 5, "output_tokens" => 0, "service_tier" => "standard"}
+         }}
+      end)
+
+      assert {:error, reason} = Translation.reading_for("猫", "猫がいる。")
+      refute match?(%Ecto.Changeset{}, reason)
+      refute is_struct(reason)
     end
   end
 

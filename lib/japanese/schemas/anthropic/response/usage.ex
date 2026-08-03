@@ -19,8 +19,12 @@ defmodule Japanese.Schemas.Anthropic.Response.Usage do
 
   @doc """
   Returns a changeset for validating/parsing usage information from a map.
-  Required: input_tokens, output_tokens, service_tier.
-  Optional: cache_creation_input_tokens, cache_read_input_tokens.
+  Required: input_tokens, output_tokens.
+  Optional: service_tier, cache_creation_input_tokens, cache_read_input_tokens.
+
+  `service_tier` is deliberately optional: Anthropic does not guarantee it is
+  present on every response, and requiring it turned an otherwise-perfectly-
+  usable response into a hard failure.
   """
   @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(struct, attrs) do
@@ -32,7 +36,7 @@ defmodule Japanese.Schemas.Anthropic.Response.Usage do
       :cache_creation_input_tokens,
       :cache_read_input_tokens
     ])
-    |> validate_required([:input_tokens, :output_tokens, :service_tier])
+    |> validate_required([:input_tokens, :output_tokens])
   end
 
   @doc false
