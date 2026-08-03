@@ -209,6 +209,37 @@ defmodule Test.Japanese.Translation do
       assert Translation.reading_for("勉強した", sentence) == {:ok, "べんきょうした"}
     end
 
+    test "strips the template whitespace that the rendered line arrives wrapped in" do
+      # The client reads the context out of a rendered .tr-ja element, so it can
+      # arrive carrying the template's indentation and newlines.
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        [%{role: "user", content: user_text}] = Keyword.fetch!(opts, :messages)
+
+        assert user_text ==
+                 "Sentence: 彼は昨日学校に行った。\nSelected portion: 行った"
+
+        {:ok,
+         %{
+           "id" => "msg_reading_ws",
+           "model" => "claude-sonnet-4-20250514",
+           "role" => "assistant",
+           "type" => "message",
+           "stop_reason" => "end_turn",
+           "content" => [%{"type" => "text", "text" => "いった"}],
+           "usage" => %{
+             "input_tokens" => 20,
+             "output_tokens" => 3,
+             "service_tier" => "standard"
+           }
+         }}
+      end)
+
+      assert Translation.reading_for(
+               "  行った ",
+               "\n            彼は昨日学校に行った。\n          "
+             ) == {:ok, "いった"}
+    end
+
     test "caps max_tokens low but well above a single word, since the selection may be a whole line" do
       Mimic.expect(Anthropix, :chat, fn _client, opts ->
         assert Keyword.fetch!(opts, :max_tokens) == 512

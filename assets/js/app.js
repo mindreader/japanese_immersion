@@ -49,7 +49,11 @@ Hooks.TextSelection = {
             // We're selecting Japanese text! container is the .tr-ja line
             // itself, so grab its full text as context while we have it.
             this.selectedText = selectedText;
-            this.selectedContext = container.textContent;
+            // textContent carries the template's own indentation and newlines
+            // around the line, which would otherwise be sent to the model as
+            // part of the sentence. Trim so the context matches the selection,
+            // which is already trimmed above.
+            this.selectedContext = container.textContent.trim();
             this.pushEvent("text_selected", { text: selectedText, context: this.selectedContext });
             return;
           }

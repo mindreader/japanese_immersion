@@ -227,7 +227,11 @@ defmodule Japanese.Translation do
       given the sentence, reply with exactly: unknown
     """
 
-    user = "Sentence: #{context}\nSelected portion: #{selection}"
+    # Both sides are trimmed here as well as in the client: the context is
+    # captured from a rendered element, so it can arrive carrying the
+    # template's surrounding whitespace, and a sentence that begins with a
+    # newline makes the labelled structure below harder to read, not easier.
+    user = "Sentence: #{String.trim(context)}\nSelected portion: #{String.trim(selection)}"
 
     case call_anthropix(system_prompt, user, :reading, max_tokens: 512)
          |> handle_response(:reading) do
