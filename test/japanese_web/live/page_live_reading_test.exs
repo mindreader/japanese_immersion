@@ -93,7 +93,7 @@ defmodule JapaneseWeb.PageLive.ReadingTest do
 
     render_click(view, "start_reading", %{"text" => "猫", "context" => "猫がいる。"})
 
-    eventually(fn -> render(view) =~ "Failed to look up reading" end)
+    eventually(fn -> render(view) =~ "Could not look up reading" end)
     refute render(view) =~ "Cancel..."
   end
 
@@ -128,5 +128,24 @@ defmodule JapaneseWeb.PageLive.ReadingTest do
     render_click(view, "close_reading", %{})
 
     refute render(view) =~ "ねこ"
+  end
+
+  # Regression test for the actual user complaint: selecting a long phrase
+  # used to surface a 654-character `inspect/1`ed Ecto.Changeset on screen.
+  # The exhaustive "is this short and debris-free" checks live once, against
+  # `JapaneseWeb.TranslationErrors`, in test/japanese_web/translation_errors_test.exs
+  # — this just proves the LiveView is actually wired up to it.
+  test "a reading failure renders the shared formatter's message, not the raw reason", %{
+    view: view
+  } do
+    Mimic.stub(Translation, :reading_for, fn _selection, _context -> {:error, :truncated} end)
+
+    render_click(view, "start_reading", %{"text" => "猫", "context" => "猫がいる。"})
+
+    eventually(fn ->
+      render(view) =~ JapaneseWeb.TranslationErrors.reading_message(:truncated)
+    end)
+
+    refute render(view) =~ "Ecto.Changeset"
   end
 end

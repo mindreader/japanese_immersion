@@ -1,6 +1,10 @@
 defmodule JapaneseWeb.PageLive.Show do
   use JapaneseWeb, :live_view
 
+  require Logger
+
+  alias JapaneseWeb.TranslationErrors
+
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
     {:ok,
@@ -148,18 +152,22 @@ defmodule JapaneseWeb.PageLive.Show do
     # Task crashed or was killed
     cond do
       explain_task_ref(socket) == ref ->
+        Logger.warning("Explain task crashed: #{inspect(reason)}")
+
         {:noreply,
          socket
          |> assign(:explaining, false)
          |> assign(:explain_task, nil)
-         |> assign(:explanation, "Failed to generate explanation: #{inspect(reason)}")}
+         |> assign(:explanation, TranslationErrors.explain_message(reason))}
 
       reading_task_ref(socket) == ref ->
+        Logger.warning("Reading task crashed: #{inspect(reason)}")
+
         {:noreply,
          socket
          |> assign(:reading_loading, false)
          |> assign(:reading_task, nil)
-         |> assign(:reading, {:error, "Failed to look up reading: #{inspect(reason)}"})}
+         |> assign(:reading, {:error, TranslationErrors.reading_message(reason)})}
 
       true ->
         {:noreply, socket}
@@ -190,7 +198,8 @@ defmodule JapaneseWeb.PageLive.Show do
       Task.Supervisor.async_nolink(Japanese.TaskSupervisor.name(), fn ->
         case Japanese.Translation.explain_text(selected_text) do
           {:error, reason} ->
-            {:error, "Failed to generate explanation: #{inspect(reason)}"}
+            Logger.warning("Explain lookup failed: #{inspect(reason)}")
+            {:error, TranslationErrors.explain_message(reason)}
 
           explanation when is_binary(explanation) ->
             {:ok, explanation}
@@ -236,7 +245,8 @@ defmodule JapaneseWeb.PageLive.Show do
             {:unknown, "No confident reading for this context."}
 
           {:error, reason} ->
-            {:error, "Could not look up reading: #{inspect(reason)}"}
+            Logger.warning("Reading lookup failed: #{inspect(reason)}")
+            {:error, TranslationErrors.reading_message(reason)}
         end
       end)
 

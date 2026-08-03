@@ -17,13 +17,19 @@ defmodule Japanese.Schemas.Anthropic.Response.Content do
 
   @doc """
   Returns a changeset for validating/parsing a content object from a map.
-  Required: type, text.
+  Required: type. :text is deliberately optional — Anthropic returns content
+  blocks with no `text` key at all (e.g. `thinking`, `tool_use`), and can
+  return a text block with an empty string when a response is cut off by
+  `max_tokens` before any output token is emitted. Neither of those is a
+  malformed response; callers that need actual text should look across all
+  content blocks for one that has any, rather than assuming the schema will
+  reject the rest for them.
   """
   @spec changeset(t(), map()) :: Ecto.Changeset.t()
   def changeset(struct, attrs) do
     struct
     |> cast(attrs, [:type, :text])
-    |> validate_required([:type, :text])
+    |> validate_required([:type])
   end
 
   @doc false

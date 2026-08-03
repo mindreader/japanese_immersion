@@ -26,6 +26,21 @@ defmodule Japanese.Translation do
   # (see `model/1`) if this default ever proves insufficient.
   @default_model "claude-sonnet-5"
 
+  # `reading_for/2` scales its output-token ceiling off the length of the
+  # selection instead of pinning one constant: the model's kana reply is
+  # roughly comparable in length to the source text, character for
+  # character (occasionally a bit longer — a single kanji can expand to
+  # several kana), so a fixed small ceiling that's fine for a word starves a
+  # whole-line selection and gets misreported as :truncated. Budgeting a
+  # handful of output tokens per input character gives headroom even though
+  # kana usually maps to more than one token per character under a
+  # byte/subword tokenizer. The floor keeps short selections (a single
+  # kanji, a short word) comfortably above what a bare reading needs; the
+  # cap bounds worst-case cost/latency for a pathological selection.
+  @reading_tokens_per_char 4
+  @reading_min_tokens 512
+  @reading_max_tokens 4096
+
   @type ja_to_en_opts :: [
           literalness: :literal | :natural,
           translation_notes: boolean(),
@@ -233,11 +248,22 @@ defmodule Japanese.Translation do
     # newline makes the labelled structure below harder to read, not easier.
     user = "Sentence: #{String.trim(context)}\nSelected portion: #{String.trim(selection)}"
 
-    case call_anthropix(system_prompt, user, :reading, max_tokens: 512)
+    max_tokens = reading_max_tokens(selection)
+
+    case call_anthropix(system_prompt, user, :reading, max_tokens: max_tokens)
          |> handle_response(:reading) do
       {:error, reason} -> {:error, reason}
       text when is_binary(text) -> if unknown_reply?(text), do: :unknown, else: {:ok, text}
     end
+  end
+
+  @spec reading_max_tokens(String.t()) :: pos_integer()
+  defp reading_max_tokens(selection) do
+    selection
+    |> String.length()
+    |> Kernel.*(@reading_tokens_per_char)
+    |> max(@reading_min_tokens)
+    |> min(@reading_max_tokens)
   end
 
   defp unknown_reply?(text) do
@@ -372,7 +398,14 @@ defmodule Japanese.Translation do
     )
     |> case do
       {:ok, anthropix_result} ->
-        Response.parse_response(anthropix_result)
+        case Response.parse_response(anthropix_result) do
+          {:ok, response} ->
+            {:ok, response}
+
+          {:error, changeset} ->
+            log_invalid_response(changeset, anthropix_result, operation)
+            {:error, :invalid_response}
+        end
 
       {:error, %Req.TransportError{reason: :closed}} = error ->
         if retry > 0 do
@@ -391,10 +424,56 @@ defmodule Japanese.Translation do
     end
   end
 
-  defp check_stop_reason("end_turn", _response, _operation), do: :ok
-  defp check_stop_reason(nil, _response, _operation), do: :ok
+  # Response validation failing means the raw API payload had some shape we
+  # didn't expect (the three known triggers were: a blank text field, a
+  # non-text block, or a missing `service_tier`). The caller only ever sees
+  # a short `:invalid_response` atom — never this changeset — but the
+  # *reason* it failed still needs to be discoverable from the logs,
+  # without dumping the whole changeset (which is exactly the "very long
+  # difficult to hide error" this exists to prevent). `traverse_errors/2`
+  # gives us just the blank/invalid field names instead of the struct.
+  defp log_invalid_response(changeset, raw_response, operation) do
+    stop_reason = Map.get(raw_response, "stop_reason")
 
-  defp check_stop_reason(stop_reason, response, operation) do
+    block_types =
+      raw_response
+      |> Map.get("content", [])
+      |> Enum.map(&Map.get(&1, "type"))
+
+    blank_fields = Ecto.Changeset.traverse_errors(changeset, fn {msg, _opts} -> msg end)
+
+    Logger.warning(
+      "Anthropic response failed validation. " <>
+        "Operation: #{operation}. Stop reason: #{inspect(stop_reason)}. " <>
+        "Content block types: #{inspect(block_types)}. Invalid fields: #{inspect(blank_fields)}"
+    )
+  end
+
+  # Picks the first content block that actually carries usable text,
+  # regardless of position. A `thinking` (or any non-text) block ahead of
+  # the real answer must not shadow it, and a block with an empty string
+  # (an empty-output max_tokens cutoff) doesn't count as text either.
+  defp first_text(content) do
+    Enum.find_value(content, fn
+      %{text: text} when is_binary(text) and text != "" -> text
+      _ -> nil
+    end)
+  end
+
+  defp log_no_usable_text(response, operation) do
+    block_types = Enum.map(response.content, & &1.type)
+
+    Logger.warning(
+      "Anthropic response had no usable text in any content block. " <>
+        "Operation: #{operation}. Stop reason: #{inspect(response.stop_reason)}. " <>
+        "Content block types: #{inspect(block_types)}"
+    )
+  end
+
+  defp check_stop_reason("end_turn", _response, _operation, _text), do: :ok
+  defp check_stop_reason(nil, _response, _operation, _text), do: :ok
+
+  defp check_stop_reason(stop_reason, response, operation, text) do
     Logger.metadata(model: response.model)
 
     Logger.warning("""
@@ -403,55 +482,61 @@ defmodule Japanese.Translation do
     Stop reason: #{stop_reason}
     Model: #{response.model}
     Usage: #{inspect(response.usage)}
-    Text length: #{String.length(List.first(response.content).text)} characters
+    Text length: #{String.length(text)} characters
     """)
   end
 
-  defp handle_response(
-         {:ok,
-          %{content: [%{text: text} | _], usage: usage, stop_reason: stop_reason} = response},
-         :ja_to_en
-       ) do
-    check_stop_reason(stop_reason, response, :ja_to_en)
-    %__MODULE__{text: text, usage: usage}
-  end
+  defp handle_response({:ok, response}, :ja_to_en) do
+    case first_text(response.content) do
+      nil ->
+        log_no_usable_text(response, :ja_to_en)
+        {:error, :no_usable_text}
 
-  defp handle_response(
-         {:ok, %{content: [%{text: text} | _], stop_reason: stop_reason} = response},
-         :en_to_ja
-       )
-       when is_binary(text) do
-    check_stop_reason(stop_reason, response, :en_to_ja)
-    %{text: text}
-  end
-
-  defp handle_response(
-         {:ok, %{content: [%{text: text} | _], stop_reason: stop_reason} = response},
-         :explain
-       )
-       when is_binary(text) do
-    check_stop_reason(stop_reason, response, :explain)
-    text
-  end
-
-  defp handle_response(
-         {:ok, %{content: [%{text: text} | _], stop_reason: stop_reason} = response},
-         :reading
-       )
-       when is_binary(text) do
-    check_stop_reason(stop_reason, response, :reading)
-
-    case stop_reason do
-      "max_tokens" -> {:error, :truncated}
-      _ -> String.trim(text)
+      text ->
+        check_stop_reason(response.stop_reason, response, :ja_to_en, text)
+        %__MODULE__{text: text, usage: response.usage}
     end
   end
 
-  defp handle_response({:ok, %{content: []}}, _),
-    do: {:error, :no_content}
+  defp handle_response({:ok, response}, :en_to_ja) do
+    case first_text(response.content) do
+      nil ->
+        log_no_usable_text(response, :en_to_ja)
+        {:error, :no_usable_text}
 
-  defp handle_response({:ok, %{content: _messages}}, _),
-    do: {:error, :multiple_messages}
+      text ->
+        check_stop_reason(response.stop_reason, response, :en_to_ja, text)
+        %{text: text}
+    end
+  end
+
+  defp handle_response({:ok, response}, :explain) do
+    case first_text(response.content) do
+      nil ->
+        log_no_usable_text(response, :explain)
+        {:error, :no_usable_text}
+
+      text ->
+        check_stop_reason(response.stop_reason, response, :explain, text)
+        text
+    end
+  end
+
+  defp handle_response({:ok, response}, :reading) do
+    case first_text(response.content) do
+      nil ->
+        log_no_usable_text(response, :reading)
+        {:error, :no_usable_text}
+
+      text ->
+        check_stop_reason(response.stop_reason, response, :reading, text)
+
+        case response.stop_reason do
+          "max_tokens" -> {:error, :truncated}
+          _ -> String.trim(text)
+        end
+    end
+  end
 
   defp handle_response({:error, err}, _),
     do: {:error, err}

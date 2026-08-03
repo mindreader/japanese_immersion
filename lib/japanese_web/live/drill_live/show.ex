@@ -10,7 +10,10 @@ defmodule JapaneseWeb.DrillLive.Show do
 
   use JapaneseWeb, :live_view
 
+  require Logger
+
   alias Japanese.Drill
+  alias JapaneseWeb.TranslationErrors
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
@@ -76,7 +79,8 @@ defmodule JapaneseWeb.DrillLive.Show do
       Task.Supervisor.async_nolink(Japanese.TaskSupervisor.name(), fn ->
         case Japanese.Translation.explain_form(payload) do
           {:error, reason} ->
-            {:error, "Failed to generate explanation: #{inspect(reason)}"}
+            Logger.warning("Drill explain lookup failed: #{inspect(reason)}")
+            {:error, TranslationErrors.explain_message(reason)}
 
           text when is_binary(text) ->
             {:ok, text}
@@ -127,11 +131,13 @@ defmodule JapaneseWeb.DrillLive.Show do
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, socket) do
     if explain_task_ref(socket) == ref do
+      Logger.warning("Drill explain task crashed: #{inspect(reason)}")
+
       {:noreply,
        socket
        |> assign(:explaining, false)
        |> assign(:explain_task, nil)
-       |> assign(:explanation, "Failed to generate explanation: #{inspect(reason)}")}
+       |> assign(:explanation, TranslationErrors.explain_message(reason))}
     else
       {:noreply, socket}
     end

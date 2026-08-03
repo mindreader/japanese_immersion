@@ -43,6 +43,10 @@ defmodule JapaneseWeb.DrillLive.ExplainTest do
     render_click(view, "start_explain", %{})
 
     eventually(fn -> render(view) =~ "Failed to generate explanation" end)
+    # Proves this is wired to the shared JapaneseWeb.TranslationErrors
+    # formatter rather than a local inspect(reason) — the formatting/length
+    # rules themselves are asserted once in translation_errors_test.exs.
+    refute render(view) =~ "Ecto.Changeset"
   end
 
   @tag capture_log: true
