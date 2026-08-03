@@ -1,5 +1,4 @@
 defmodule JapaneseWeb.PageLive.Show do
-  require Logger
   use JapaneseWeb, :live_view
 
   @impl Phoenix.LiveView
@@ -150,12 +149,6 @@ defmodule JapaneseWeb.PageLive.Show do
   @impl Phoenix.LiveView
   def handle_event("clear_selection", _params, socket) do
     {:noreply, assign(socket, :selected_text, nil)}
-  end
-
-  @impl Phoenix.LiveView
-  def handle_event("demo_action", _params, socket) do
-    Logger.info("Demo action triggered! Selected text: #{inspect(socket.assigns.selected_text)}")
-    {:noreply, socket}
   end
 
   @impl Phoenix.LiveView
