@@ -172,6 +172,62 @@ defmodule Japanese.Translation do
   end
 
   @doc """
+  Looks up the kana reading of a selected word or phrase, as it is actually
+  read within its containing sentence.
+
+  Kanji readings are context-dependent (e.g. 行った is いった "went" or
+  おこなった "carried out" depending on the sentence), so `context` — the full
+  sentence/line the selection was taken from — is required, not optional.
+  Sending the bare selection alone would let the model guess plausibly and
+  wrongly with no way for the learner to notice.
+
+  This is intentionally tiny and fast: no grammar breakdown, no translation,
+  just the reading. If the model can't determine a confident reading from
+  the given context, or if the response gets cut off before it could finish
+  (a truncated reading is worse than no reading — it looks complete and is
+  silently wrong), this returns `:unknown` or `{:error, reason}` respectively
+  rather than a partial/guessed answer; callers should treat those as
+  distinct "can't tell" cases rather than a real reading.
+  """
+  @spec reading_for(String.t(), String.t()) :: {:ok, String.t()} | :unknown | {:error, term()}
+  def reading_for(selection, context) when is_binary(selection) and is_binary(context) do
+    system_prompt = """
+    You will be given a Japanese sentence and a word or phrase selected from
+    within it. Reply with ONLY the kana reading of the selected portion,
+    exactly as it is read in that sentence — kanji readings depend on
+    surrounding context, so use the sentence to disambiguate (okurigana,
+    compound readings, names, etc.).
+
+    Rules:
+    - Use hiragana for kanji and native Japanese vocabulary. If part of the
+      selection is already katakana (loanwords, onomatopoeia, foreign
+      names), keep that part in katakana exactly as written — do not
+      convert it to hiragana, and do not alter the long vowel mark ー.
+    - Reply with kana only. No romaji, no kanji, no translation, no
+      punctuation, no explanation, nothing else.
+    - The selection may be a whole sentence/line, not just a single word —
+      transcribe all of it, not just part of it.
+    - If you cannot determine the reading with reasonable confidence even
+      given the sentence, reply with exactly: unknown
+    """
+
+    user = "Sentence: #{context}\nSelected portion: #{selection}"
+
+    case call_anthropix(system_prompt, user, :reading, max_tokens: 512)
+         |> handle_response(:reading) do
+      {:error, reason} -> {:error, reason}
+      text when is_binary(text) -> if unknown_reply?(text), do: :unknown, else: {:ok, text}
+    end
+  end
+
+  defp unknown_reply?(text) do
+    text
+    |> String.downcase()
+    |> String.replace(~r/[^\p{L}]/u, "")
+    |> Kernel.==("unknown")
+  end
+
+  @doc """
   Translates the japanese page synchronously. This can often take some time...
 
   If you want to translate a page asynchronously, use the `Japanese.Translation.Service` module.
@@ -209,12 +265,17 @@ defmodule Japanese.Translation do
   Returns the Anthropic model id to use for the given operation.
 
   Configurable via `config :japanese, Japanese.Translation, model: "..."` (a
-  shared default) and/or `models: %{ja_to_en: "...", en_to_ja: "...", explain: "..."}`
+  shared default) and/or
+  `models: %{ja_to_en: "...", en_to_ja: "...", explain: "...", reading: "..."}`
   (a per-operation override). A per-operation entry wins over the shared
   `:model`, which itself falls back to #{inspect(@default_model)} if unset.
+
+  `:reading` is the on-demand hiragana reading lookup (see `reading_for/2`) —
+  a few tokens of output, so a cheaper/faster model is a reasonable override
+  even when the other operations stay on the shared default.
   """
-  @spec model(:ja_to_en | :en_to_ja | :explain) :: String.t()
-  def model(operation) when operation in [:ja_to_en, :en_to_ja, :explain] do
+  @spec model(:ja_to_en | :en_to_ja | :explain | :reading) :: String.t()
+  def model(operation) when operation in [:ja_to_en, :en_to_ja, :explain, :reading] do
     config = Application.get_env(:japanese, __MODULE__, [])
     models = Keyword.get(config, :models, %{})
 
@@ -273,6 +334,7 @@ defmodule Japanese.Translation do
   defp call_anthropix(system_prompt, user_text, operation, opts \\ []) do
     client = build_client()
     retry = Keyword.get(opts, :retries, 3)
+    max_tokens = Keyword.get(opts, :max_tokens, 16_384)
 
     Anthropix.chat(
       client,
@@ -281,7 +343,7 @@ defmodule Japanese.Translation do
         %{role: "user", content: user_text}
       ],
       system: system_prompt,
-      max_tokens: 16_384
+      max_tokens: max_tokens
     )
     |> case do
       {:ok, anthropix_result} ->
@@ -345,6 +407,19 @@ defmodule Japanese.Translation do
        when is_binary(text) do
     check_stop_reason(stop_reason, response, :explain)
     text
+  end
+
+  defp handle_response(
+         {:ok, %{content: [%{text: text} | _], stop_reason: stop_reason} = response},
+         :reading
+       )
+       when is_binary(text) do
+    check_stop_reason(stop_reason, response, :reading)
+
+    case stop_reason do
+      "max_tokens" -> {:error, :truncated}
+      _ -> String.trim(text)
+    end
   end
 
   defp handle_response({:ok, %{content: []}}, _),
