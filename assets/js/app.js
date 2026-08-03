@@ -28,6 +28,11 @@ let Hooks = {};
 Hooks.TextSelection = {
   mounted() {
     this.selectedText = "";
+    // The full line the current selection was taken from. Readings are
+    // context-dependent (kanji can be read multiple ways depending on the
+    // sentence), so this travels alongside the selection everywhere it goes
+    // instead of being dropped after the DOM walk below.
+    this.selectedContext = "";
 
     this.handleSelection = () => {
       const selection = window.getSelection();
@@ -41,9 +46,11 @@ Hooks.TextSelection = {
         // Walk up the DOM tree to find if we're inside a tr-ja element
         while (container && container !== this.el) {
           if (container.classList && container.classList.contains('tr-ja')) {
-            // We're selecting Japanese text!
+            // We're selecting Japanese text! container is the .tr-ja line
+            // itself, so grab its full text as context while we have it.
             this.selectedText = selectedText;
-            this.pushEvent("text_selected", { text: selectedText });
+            this.selectedContext = container.textContent;
+            this.pushEvent("text_selected", { text: selectedText, context: this.selectedContext });
             return;
           }
           container = container.parentElement;
@@ -52,6 +59,7 @@ Hooks.TextSelection = {
 
       // If no Japanese text selected, clear selection
       this.selectedText = "";
+      this.selectedContext = "";
       this.pushEvent("clear_selection", {});
     };
 
@@ -62,11 +70,15 @@ Hooks.TextSelection = {
     this.handleActionClick = (e) => {
       const jpdb = e.target.closest('#jpdb-button');
       const explain = e.target.closest('#explain-button');
-      if (!jpdb && !explain) return;
+      const reading = e.target.closest('#reading-button');
+      if (!jpdb && !explain && !reading) return;
 
       e.preventDefault();
       const text = this.selectedText;
       if (!text) return;
+      // Same cached-at-selection-time value used above, for the same
+      // anti-race reason: a fresh lookup here could race a server round-trip.
+      const context = this.selectedContext;
 
       if (jpdb) {
         window.open(
@@ -74,6 +86,8 @@ Hooks.TextSelection = {
           '_blank',
           'noopener,noreferrer'
         );
+      } else if (reading) {
+        this.pushEvent("start_reading", { text, context });
       } else {
         this.pushEvent("start_explain", { text });
       }
@@ -92,6 +106,7 @@ Hooks.TextSelection = {
 
       if (!this.el.contains(e.target) && !clickedModal) {
         this.selectedText = "";
+        this.selectedContext = "";
         this.pushEvent("clear_selection", {});
       }
     });
