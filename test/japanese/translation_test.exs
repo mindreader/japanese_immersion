@@ -44,6 +44,52 @@ defmodule Test.Japanese.Translation do
     :ok
   end
 
+  describe "model/1" do
+    setup do
+      original = Application.get_env(:japanese, Translation, [])
+      on_exit(fn -> Application.put_env(:japanese, Translation, original) end)
+      :ok
+    end
+
+    test "falls back to the compiled-in default when unset" do
+      Application.put_env(:japanese, Translation, api_key: "dummy-key")
+
+      assert Translation.model(:ja_to_en) == "claude-sonnet-5"
+      assert Translation.model(:en_to_ja) == "claude-sonnet-5"
+      assert Translation.model(:explain) == "claude-sonnet-5"
+    end
+
+    test "uses the configured shared :model for every operation" do
+      Application.put_env(:japanese, Translation, api_key: "dummy-key", model: "claude-opus-5")
+
+      assert Translation.model(:ja_to_en) == "claude-opus-5"
+      assert Translation.model(:en_to_ja) == "claude-opus-5"
+      assert Translation.model(:explain) == "claude-opus-5"
+    end
+
+    test "a per-operation entry in :models overrides the shared :model" do
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        model: "claude-opus-5",
+        models: %{explain: "claude-haiku-5"}
+      )
+
+      assert Translation.model(:explain) == "claude-haiku-5"
+      assert Translation.model(:ja_to_en) == "claude-opus-5"
+      assert Translation.model(:en_to_ja) == "claude-opus-5"
+    end
+
+    test "a per-operation entry in :models overrides the compiled-in default" do
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        models: %{ja_to_en: "claude-haiku-5"}
+      )
+
+      assert Translation.model(:ja_to_en) == "claude-haiku-5"
+      assert Translation.model(:en_to_ja) == "claude-sonnet-5"
+    end
+  end
+
   describe "ja_to_en/2" do
     test "returns a Translation struct on success" do
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @anthropix_response_en} end)

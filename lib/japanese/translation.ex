@@ -5,11 +5,26 @@ defmodule Japanese.Translation do
   This module is also a struct representing a translation result, with fields:
     - :text (the translated text)
     - :usage (the usage struct)
+
+  ## Model selection
+
+  The Anthropic model is configured rather than pinned in code (see `model/1`).
+  We default to the unpinned `"claude-sonnet-5"` alias instead of a dated
+  snapshot id: a dated id is perfectly reproducible but eventually gets
+  deprecated and starts hard-failing, while an alias keeps working but means
+  behaviour can drift underneath us without a code change. For this app's
+  workload — bulk literal translation, judged mainly on faithfulness rather
+  than creative quality — we're accepting that drift risk in exchange for not
+  having to chase deprecations.
   """
 
   require Logger
 
-  @model "claude-sonnet-4-5-20250929"
+  # Cheaper than an Opus-class model with a much larger output ceiling and a
+  # 1M context, which comfortably covers whole-page interleaved translation.
+  # Switching to "claude-opus-5" for higher quality is a config-only change
+  # (see `model/1`) if this default ever proves insufficient.
+  @default_model "claude-sonnet-5"
 
   @type ja_to_en_opts :: [
           literalness: :literal | :natural,
@@ -49,7 +64,7 @@ defmodule Japanese.Translation do
 
     opts
     |> build_ja_to_en_prompt()
-    |> call_anthropix(text)
+    |> call_anthropix(text, :ja_to_en)
     |> handle_response(:ja_to_en)
   end
 
@@ -79,7 +94,7 @@ defmodule Japanese.Translation do
   def en_to_ja(text, opts \\ []) when is_binary(text) and is_list(opts) do
     opts
     |> build_en_to_ja_prompt()
-    |> call_anthropix(text)
+    |> call_anthropix(text, :en_to_ja)
     |> handle_response(:en_to_ja)
   end
 
@@ -112,7 +127,7 @@ defmodule Japanese.Translation do
 
     text
     |> cleanup()
-    |> then(&call_anthropix(system_prompt, &1))
+    |> then(&call_anthropix(system_prompt, &1, :explain))
     |> handle_response(:explain)
   end
 
@@ -152,7 +167,7 @@ defmodule Japanese.Translation do
     Conjugated form: #{ctx.conjugated_kanji} (#{ctx.conjugated_kana})
     """
 
-    call_anthropix(system_prompt, user)
+    call_anthropix(system_prompt, user, :explain)
     |> handle_response(:explain)
   end
 
@@ -189,6 +204,22 @@ defmodule Japanese.Translation do
   end
 
   defdelegate translate_page_async(page), to: Japanese.Translation.Service, as: :translate_page
+
+  @doc """
+  Returns the Anthropic model id to use for the given operation.
+
+  Configurable via `config :japanese, Japanese.Translation, model: "..."` (a
+  shared default) and/or `models: %{ja_to_en: "...", en_to_ja: "...", explain: "..."}`
+  (a per-operation override). A per-operation entry wins over the shared
+  `:model`, which itself falls back to #{inspect(@default_model)} if unset.
+  """
+  @spec model(:ja_to_en | :en_to_ja | :explain) :: String.t()
+  def model(operation) when operation in [:ja_to_en, :en_to_ja, :explain] do
+    config = Application.get_env(:japanese, __MODULE__, [])
+    models = Keyword.get(config, :models, %{})
+
+    Map.get(models, operation) || Keyword.get(config, :model, @default_model)
+  end
 
   defp build_ja_to_en_prompt(opts) do
     literalness = Keyword.get(opts, :literalness, :literal)
@@ -239,13 +270,13 @@ defmodule Japanese.Translation do
     Anthropix.init(api_key, receive_timeout: 600_000)
   end
 
-  defp call_anthropix(system_prompt, user_text, opts \\ []) do
+  defp call_anthropix(system_prompt, user_text, operation, opts \\ []) do
     client = build_client()
     retry = Keyword.get(opts, :retries, 3)
 
     Anthropix.chat(
       client,
-      model: @model,
+      model: model(operation),
       messages: [
         %{role: "user", content: user_text}
       ],
@@ -258,7 +289,12 @@ defmodule Japanese.Translation do
 
       {:error, %Req.TransportError{reason: :closed}} = error ->
         if retry > 0 do
-          call_anthropix(system_prompt, user_text, Keyword.put(opts, :retries, retry - 1))
+          call_anthropix(
+            system_prompt,
+            user_text,
+            operation,
+            Keyword.put(opts, :retries, retry - 1)
+          )
         else
           error
         end
@@ -272,6 +308,8 @@ defmodule Japanese.Translation do
   defp check_stop_reason(nil, _response, _operation), do: :ok
 
   defp check_stop_reason(stop_reason, response, operation) do
+    Logger.metadata(model: response.model)
+
     Logger.warning("""
     Translation stopped without finishing naturally.
     Operation: #{operation}
