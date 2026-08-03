@@ -64,7 +64,6 @@ defmodule Japanese.Translation.Service do
     require Logger
 
     use GenServer
-    alias Japanese.Translation.Service
     alias Japanese.Corpus.Page
 
     def start_link(opts \\ []) do
@@ -90,7 +89,7 @@ defmodule Japanese.Translation.Service do
           state = put_in(state.statuses[key], :in_progress)
           Japanese.Events.Page.translation_started(page)
 
-          Task.Supervisor.async_nolink(Service.task_supervisor(), fn ->
+          Task.Supervisor.async_nolink(Japanese.TaskSupervisor.name(), fn ->
             Logger.info("Translating story #{page.story} page #{page.number}")
             {key, page, Japanese.Translation.translate_page(page)}
           end)
@@ -158,15 +157,6 @@ defmodule Japanese.Translation.Service do
 
     case config[:timeout_ms] do
       nil -> 600 |> :timer.seconds()
-      other -> other
-    end
-  end
-
-  def task_supervisor do
-    config = config()
-
-    case config[:task_supervisor] do
-      nil -> Japanese.Task.Supervisor
       other -> other
     end
   end
