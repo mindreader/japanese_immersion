@@ -6,9 +6,13 @@ defmodule Test.Fixtures.OldTranslation do
   on a machine this repository cannot see, and it is read-only: it must keep
   rendering without being migrated, rewritten or re-translated. These fixtures
   are the only evidence we can run in CI that it still does, so they mirror a
-  real `<n>tr.yaml` byte for byte in shape — pretty-printed, two-space indent,
-  keys alphabetised so `english` comes first, and nothing but `japanese`,
-  `english` and `paragraph_break`.
+  real `<n>tr.yaml` byte for byte in shape — keys alphabetised so `english` comes
+  first, and nothing but `japanese`, `english` and `paragraph_break`.
+
+  Two on-disk styles are both live, because pretty printing is configured per
+  environment: production writes one minified line with no trailing newline,
+  development writes it indented. Nothing that reads a file may care which it is
+  looking at, so both are represented here.
   """
 
   @doc """
@@ -62,6 +66,14 @@ defmodule Test.Fixtures.OldTranslation do
     Jason.encode!(%{"title" => "TODO", "translation" => Enum.map(entries, &entry/1)},
       pretty: true
     )
+  end
+
+  @doc """
+  The same entries in the production style: one minified line, no trailing newline.
+  """
+  @spec minified_page([:paragraph_break | {String.t(), String.t()}]) :: String.t()
+  def minified_page(entries) do
+    Jason.encode!(%{"title" => "TODO", "translation" => Enum.map(entries, &entry/1)})
   end
 
   @doc """

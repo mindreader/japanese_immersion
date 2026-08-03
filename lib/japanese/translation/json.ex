@@ -15,16 +15,20 @@ defmodule Japanese.Translation.Json do
 
   Three layers guard against it, each a fallback for the one before:
 
-  1. **Classification.** Lines are classified by script (`:japanese`, `:latin`,
-     `:separator`) rather than by their position in the reply. A separator glyph
-     never consumes a pairing slot, and nothing is silently discarded.
+  1. **Classification.** Lines are classified by what they are made of rather
+     than by their position in the reply: a line of the source, a translation, or
+     a decorative glyph that never consumes a pairing slot. Nothing is silently
+     discarded. Membership of the source outranks the look of a line, because the
+     two genuinely disagree — 「、、、、、」 is a character trailing off into silence,
+     it holds no kana and no kanji, and it is dialogue with a translation.
 
   2. **Source anchoring.** The caller passes the original Japanese, which is the
      authoritative text — the model's echo of it is not. Every entry in the
-     output corresponds to exactly one source line, so drift can only ever
-     affect the line that drifted. A line the model never translated is written
-     with `english: nil` and renders as a visible gap the user can retranslate,
-     instead of silently shifting the rest of the page.
+     output corresponds to exactly one source line, and the paragraph breaks come
+     from the blank runs of the source rather than from anything the model says,
+     so drift can only ever affect the line that drifted. A line the model never
+     translated is written with `english: nil` and renders as a visible gap the
+     user can retranslate, instead of silently shifting the rest of the page.
 
   3. **Explicit indices.** The prompt numbers the source lines and asks for
      `<n><TAB><english>` back (see `number_source_lines/1` and
@@ -39,7 +43,8 @@ defmodule Japanese.Translation.Json do
       its translation. `english: nil` means "not translated", not "empty".
     * `%{separator: String.t()}` — a glyph-only line (`◇◆◇`, `※`, `……`) that is
       structural rather than prose.
-    * `%{paragraph_break: true}` — a scene transition.
+    * `%{paragraph_break: true}` — a paragraph or scene transition, one per run
+      of two or more blank source lines.
 
   Per-entry fields are optional and additive: a future `reading` key belongs
   alongside `japanese`/`english` on a pair entry, where it cannot perturb
@@ -52,10 +57,21 @@ defmodule Japanese.Translation.Json do
   # accept a tab, spaces, or "." / ")" / ":" after the number, so a reply that
   # was 90% right does not fall all the way back to the positional parser.
   @indexed_line ~r/^(\d+)[.):\t ][ \t]*(\S.*)$/u
+
+  # The prompt no longer asks for scene markers — the source's blank runs say
+  # where the breaks are — but tolerating one costs nothing and old replies and
+  # unanchored callers still carry them.
   @continued_line ~r/^!CONTINUED!(?:[.):\t ][ \t]*(\d+))?\s*$/u
 
   @japanese_re ~r/[\x{3040}-\x{309F}\x{30A0}-\x{30FF}\x{4E00}-\x{9FFF}]/u
   @latin_re ~r/[A-Za-z]/u
+
+  # A structural glyph line: ◇◆◇, ＊＊＊, ―――, ※, ……, ---. Deliberately an
+  # allow-list of decorative characters, not "has no kana or kanji": a line like
+  # 「、、、、、」 is a character trailing off into silence, it has no kana or kanji
+  # either, and it is real dialogue with a real translation.
+  @separator_re ~r/^[ \x{3000}*\-=_~•…※\x{2010}-\x{2015}\x{2500}-\x{257F}\x{25A0}-\x{25FF}\x{2600}-\x{27BF}＊－＿～〜]+$/u
+  @separator_max_length 24
 
   # How many consecutive source lines the model is assumed capable of merging
   # into a single reply line, and how alike two lines must be to be taken for
@@ -81,6 +97,16 @@ defmodule Japanese.Translation.Json do
          }
 
   @typep report :: :break | {:break, pos_integer()} | {:separator, String.t()} | {:unit, unit()}
+
+  # What the source text says the page looks like: its lines, in order, and where
+  # its paragraph breaks fall. Both are facts about the source, not opinions of
+  # the model's.
+  @typep source_unit :: :break | {:line, String.t()}
+
+  # The source lines the reply is matched against, as a set of normalised forms
+  # for membership tests and as a list for similarity. `nil` when the caller has
+  # no source text, which is the only case where the reply is all we have.
+  @typep ctx :: %{norms: MapSet.t(String.t()), lines: [String.t()]} | nil
 
   @typep placed ::
            :skip
@@ -126,12 +152,14 @@ defmodule Japanese.Translation.Json do
   def format_to_translation_json(model_reply, source_japanese \\ nil, opts \\ [])
       when is_binary(model_reply) do
     label = Keyword.get(opts, :label, "unidentified page")
-    reports = parse_reply(model_reply, label)
+    units = source_units(source_japanese)
+    sources = for {:line, line} <- units, do: line
+    reports = parse_reply(model_reply, label, context(sources))
 
     translation =
-      case source_lines(source_japanese) do
+      case units do
         [] -> unanchored_entries(reports, label)
-        sources -> anchored_entries(reports, sources, label)
+        _anchored -> anchored_entries(reports, units, sources, label)
       end
 
     %{"title" => "TODO", "translation" => translation}
@@ -152,25 +180,52 @@ defmodule Japanese.Translation.Json do
     json |> Jason.decode(keys: &decode_key/1)
   end
 
+  # The structure of the page, read off the source text: each non-blank line is
+  # an entry, and a run of two or more blank lines is one paragraph break. That
+  # is exactly the shape of the translations already on disk, and it is a
+  # property of the source, so it cannot be knocked out of step by the model.
+  #
   # The bytes on disk and the bytes the model was shown are not the same: the
   # source is run through `Japanese.Translation.cleanup/1` before it is sent.
   # Anchoring has to see what the model saw, or every line with a leading
   # ideographic space — which is most of them — would fail to match exactly and
   # fall through to the fuzzy end of the ladder for no reason.
-  @spec source_lines(String.t() | nil) :: [String.t()]
-  defp source_lines(nil), do: []
+  @spec source_units(String.t() | nil) :: [source_unit()]
+  defp source_units(nil), do: []
 
-  defp source_lines(text) do
+  defp source_units(text) do
     text
     |> Japanese.Translation.cleanup()
     |> String.split("\n")
-    |> Enum.reject(&(&1 == ""))
+    |> Enum.chunk_by(&(&1 == ""))
+    |> Enum.flat_map(fn
+      ["" | _rest] = blanks when length(blanks) >= 2 -> [:break]
+      ["" | _rest] -> []
+      lines -> Enum.map(lines, &{:line, &1})
+    end)
+    |> trim_breaks()
   end
+
+  # A blank run at the top or the bottom of the page is not a break between
+  # anything: a leading one renders as a gap above the first line and a trailing
+  # one as a phantom entry after the last.
+  @spec trim_breaks([source_unit()]) :: [source_unit()]
+  defp trim_breaks(units) do
+    units
+    |> Enum.drop_while(&(&1 == :break))
+    |> Enum.reverse()
+    |> Enum.drop_while(&(&1 == :break))
+    |> Enum.reverse()
+  end
+
+  @spec context([String.t()]) :: ctx()
+  defp context([]), do: nil
+  defp context(lines), do: %{norms: MapSet.new(lines, &normalise/1), lines: lines}
 
   ## Parsing the reply
 
-  @spec parse_reply(String.t(), String.t()) :: [report()]
-  defp parse_reply(reply, label) do
+  @spec parse_reply(String.t(), String.t(), ctx()) :: [report()]
+  defp parse_reply(reply, label, ctx) do
     lines =
       reply
       |> String.split("\n")
@@ -179,10 +234,10 @@ defmodule Japanese.Translation.Json do
 
     if indexed?(lines) do
       Logger.info("Translation pairing (#{label}): reply parsed as indexed.")
-      parse_indexed(lines)
+      parse_indexed(lines, ctx)
     else
       Logger.info("Translation pairing (#{label}): reply carried no indices, parsing by script.")
-      parse_interleaved(lines)
+      parse_interleaved(lines, ctx)
     end
   end
 
@@ -197,8 +252,8 @@ defmodule Japanese.Translation.Json do
     end
   end
 
-  @spec parse_indexed([String.t()]) :: [report()]
-  defp parse_indexed(lines) do
+  @spec parse_indexed([String.t()], ctx()) :: [report()]
+  defp parse_indexed(lines, ctx) do
     lines
     |> Enum.reduce([], fn line, acc ->
       cond do
@@ -206,10 +261,10 @@ defmodule Japanese.Translation.Json do
           [continued_report(line) | acc]
 
         indexed = Regex.run(@indexed_line, line) ->
-          [indexed_report(indexed) | acc]
+          [indexed_report(indexed, ctx) | acc]
 
         true ->
-          append_to_previous(acc, line)
+          append_to_previous(acc, line, ctx)
       end
     end)
     |> Enum.reverse()
@@ -223,81 +278,115 @@ defmodule Japanese.Translation.Json do
     end
   end
 
-  @spec indexed_report([String.t()]) :: report()
-  defp indexed_report([_line, index, content]) do
+  @spec indexed_report([String.t()], ctx()) :: report()
+  defp indexed_report([_line, index, content], ctx) do
     unit = %{index: String.to_integer(index), japanese: nil, english: nil}
 
-    {:unit, put_content(unit, content)}
+    {:unit, put_content(unit, content, ctx)}
   end
 
   # A line with no index of its own continues the previous one — the model wrapped
   # a long translation. With no previous line it is preamble ("Here is the
   # translation:"), and there is nothing else it could sensibly be.
-  @spec append_to_previous([report()], String.t()) :: [report()]
-  defp append_to_previous([{:unit, unit} | rest], line) do
-    [{:unit, put_content(unit, line)} | rest]
+  @spec append_to_previous([report()], String.t(), ctx()) :: [report()]
+  defp append_to_previous([{:unit, unit} | rest], line, ctx) do
+    [{:unit, put_content(unit, line, ctx)} | rest]
   end
 
-  defp append_to_previous(acc, _line), do: acc
+  defp append_to_previous(acc, _line, _ctx), do: acc
 
-  @spec put_content(unit(), String.t()) :: unit()
-  defp put_content(unit, content) do
-    case classify(content) do
-      :japanese -> %{unit | japanese: join_text(unit.japanese, content)}
-      _english_or_glyph -> %{unit | english: join_text(unit.english, content)}
-    end
-  end
-
-  # The fallback parser, for replies that ignore the indexed contract: pair by
-  # script, never by parity. A separator glyph becomes its own report instead of
-  # consuming a pairing slot, and every English line following a Japanese line
-  # belongs to it (the model split one line into two sentences).
-  @spec parse_interleaved([String.t()]) :: [report()]
-  defp parse_interleaved(lines), do: parse_interleaved(lines, [])
-
-  defp parse_interleaved([], acc), do: Enum.reverse(acc)
-
-  defp parse_interleaved([line | rest], acc) do
-    if Regex.match?(@continued_line, line) do
-      parse_interleaved(rest, [continued_report(line) | acc])
+  @spec put_content(unit(), String.t(), ctx()) :: unit()
+  defp put_content(unit, content, ctx) do
+    if classify(content) == :japanese or source_line?(content, ctx) do
+      %{unit | japanese: join_text(unit.japanese, content)}
     else
-      parse_classified(classify(line), line, rest, acc)
+      %{unit | english: join_text(unit.english, content)}
     end
   end
 
-  @spec parse_classified(:japanese | :latin | :separator, String.t(), [String.t()], [report()]) ::
-          [report()]
-  defp parse_classified(:japanese, line, rest, acc) do
-    {english, rest} = take_english(rest)
+  # The fallback parser, for replies that ignore the indexed contract: never pair
+  # by parity. A line is a source line if the source says so; failing that, if it
+  # reads as Japanese. Every following line belongs to it as its translation (the
+  # model split one line into two sentences), and a glyph line that is not in the
+  # source becomes its own report instead of consuming a pairing slot.
+  @spec parse_interleaved([String.t()], ctx()) :: [report()]
+  defp parse_interleaved(lines, ctx), do: parse_interleaved(lines, [], ctx)
 
-    parse_interleaved(rest, [{:unit, %{index: nil, japanese: line, english: english}} | acc])
+  defp parse_interleaved([], acc, _ctx), do: Enum.reverse(acc)
+
+  defp parse_interleaved([line | rest], acc, ctx) do
+    cond do
+      Regex.match?(@continued_line, line) ->
+        parse_interleaved(rest, [continued_report(line) | acc], ctx)
+
+      japanese_side?(line, ctx) ->
+        {english, rest} = take_english(rest, ctx)
+        unit = %{index: nil, japanese: line, english: english}
+
+        parse_interleaved(rest, [{:unit, unit} | acc], ctx)
+
+      separator_line?(line) ->
+        parse_interleaved(rest, [{:separator, line} | acc], ctx)
+
+      true ->
+        unit = %{index: nil, japanese: nil, english: line}
+
+        parse_interleaved(rest, [{:unit, unit} | acc], ctx)
+    end
   end
 
-  defp parse_classified(:latin, line, rest, acc) do
-    parse_interleaved(rest, [{:unit, %{index: nil, japanese: nil, english: line}} | acc])
+  # Which side of the pair a line is on. "Is it in the source?" outranks "does it
+  # look like Japanese?", because the two disagree on real dialogue: 「、、、、、」 is
+  # a character falling silent, it carries no kana or kanji, and it has a real
+  # translation. With no source to consult, a line that is neither Latin nor a
+  # glyph is taken for the Japanese side, since that is the position it holds.
+  @spec japanese_side?(String.t(), ctx()) :: boolean()
+  defp japanese_side?(line, ctx) do
+    source_side?(line, ctx) or (is_nil(ctx) and classify(line) == :other)
   end
 
-  defp parse_classified(:separator, line, rest, acc) do
-    parse_interleaved(rest, [{:separator, line} | acc])
+  # The same question asked of a line that follows a Japanese one, where position
+  # already says "translation": only a line the source vouches for, or one that
+  # plainly reads as Japanese, ends the translation.
+  @spec source_side?(String.t(), ctx()) :: boolean()
+  defp source_side?(line, ctx) do
+    cond do
+      source_line?(line, ctx) -> true
+      classify(line) == :japanese -> true
+      is_nil(ctx) -> false
+      classify(line) != :other -> false
+      true -> resembles_source?(line, ctx)
+    end
   end
 
-  @spec take_english([String.t()]) :: {String.t() | nil, [String.t()]}
-  defp take_english(lines), do: take_english(lines, nil)
+  @spec source_line?(String.t(), ctx()) :: boolean()
+  defp source_line?(_line, nil), do: false
+  defp source_line?(line, ctx), do: MapSet.member?(ctx.norms, normalise(line))
 
-  defp take_english([], acc), do: {acc, []}
+  @spec resembles_source?(String.t(), ctx()) :: boolean()
+  defp resembles_source?(line, ctx) do
+    normalised = normalise(line)
 
-  defp take_english([line | rest] = lines, acc) do
-    if Regex.match?(@continued_line, line) or classify(line) != :latin do
+    Enum.any?(ctx.lines, &(String.jaro_distance(normalise(&1), normalised) >= @similarity))
+  end
+
+  @spec take_english([String.t()], ctx()) :: {String.t() | nil, [String.t()]}
+  defp take_english(lines, ctx), do: take_english(lines, nil, ctx)
+
+  defp take_english([], acc, _ctx), do: {acc, []}
+
+  defp take_english([line | rest] = lines, acc, ctx) do
+    if Regex.match?(@continued_line, line) or source_side?(line, ctx) or separator_line?(line) do
       {acc, lines}
     else
-      take_english(rest, join_text(acc, line))
+      take_english(rest, join_text(acc, line), ctx)
     end
   end
 
   ## Alignment against the source text
 
-  @spec anchored_entries([report()], [String.t()], String.t()) :: [map()]
-  defp anchored_entries(reports, sources, label) do
+  @spec anchored_entries([report()], [source_unit()], [String.t()], String.t()) :: [map()]
+  defp anchored_entries(reports, units, sources, label) do
     state = %{
       claimed: MapSet.new(),
       cursor: -1,
@@ -308,20 +397,15 @@ defmodule Japanese.Translation.Json do
 
     {placed, _state} = Enum.map_reduce(reports, state, &place/2)
 
-    assemble(sources, collect_englishes(placed, label), collect_breaks(placed, label), label)
+    assemble(units, collect_englishes(placed, label), label)
   end
 
+  # Paragraph breaks are read off the source text, so the model's scene markers
+  # carry no information the source does not already have — and unlike the source
+  # they can arrive in the wrong place, or not at all.
   @spec place(report(), map()) :: {placed(), map()}
-  defp place(:break, state), do: {{:break, :unknown}, state}
-
-  defp place({:break, number}, state) do
-    if in_range?(number, state) do
-      {{:break, number - 1}, state}
-    else
-      warn(state.label, "scene break points at line #{number}, which is not on this page")
-      {:skip, state}
-    end
-  end
+  defp place(:break, state), do: {:skip, state}
+  defp place({:break, _number}, state), do: {:skip, state}
 
   # Separators are emitted from the source text itself, so the model's echo of
   # one — however many times it echoed it — carries no information.
@@ -520,68 +604,50 @@ defmodule Japanese.Translation.Json do
     end
   end
 
-  @spec collect_breaks([placed()], String.t()) :: %{
-          before: MapSet.t(non_neg_integer()),
-          trailing: boolean()
-        }
-  defp collect_breaks(placed, label) do
-    placed
-    |> Enum.reverse()
-    |> Enum.reduce({%{before: MapSet.new(), trailing: false}, nil}, fn
-      {:break, :unknown}, {breaks, nil} ->
-        {%{breaks | trailing: true}, nil}
-
-      {:break, :unknown}, {breaks, next} ->
-        warn(label, "scene break carried no line number; placing it before line #{next + 1}")
-        {%{breaks | before: MapSet.put(breaks.before, next)}, next}
-
-      {:break, index}, {breaks, next} ->
-        {%{breaks | before: MapSet.put(breaks.before, index)}, next}
-
-      {:unit, index, _english, _origin}, {breaks, _next} ->
-        {breaks, index}
-
-      :skip, acc ->
-        acc
-    end)
-    |> elem(0)
-  end
-
-  @spec assemble([String.t()], map(), map(), String.t()) :: [map()]
-  defp assemble(sources, englishes, breaks, label) do
-    entries =
-      sources
-      |> Enum.with_index()
-      |> Enum.flat_map(fn {line, index} ->
-        entry = source_entry(line, Map.get(englishes, index))
-
-        if MapSet.member?(breaks.before, index), do: [paragraph_break(), entry], else: [entry]
+  @spec assemble([source_unit()], map(), String.t()) :: [map()]
+  defp assemble(units, englishes, label) do
+    {entries, _next} =
+      Enum.map_reduce(units, 0, fn
+        :break, index -> {paragraph_break(), index}
+        {:line, line}, index -> {source_entry(line, Map.get(englishes, index)), index + 1}
       end)
 
-    log_gaps(sources, englishes, label)
+    log_gaps(units, englishes, label)
 
-    if breaks.trailing, do: entries ++ [paragraph_break()], else: entries
+    entries
   end
 
+  # A glyph line is only a separator if the model also left it untranslated (or
+  # merely echoed it back). A line that got a translation is content, whatever it
+  # is made of — that is what keeps 「、、、、、」 and its "....." on the page.
   @spec source_entry(String.t(), String.t() | nil) :: map()
   defp source_entry(line, english) do
-    case classify(line) do
-      :separator -> %{"separator" => line}
-      _prose -> %{"japanese" => line, "english" => english}
+    if separator_line?(line) and echoed_or_missing?(line, english) do
+      %{"separator" => line}
+    else
+      %{"japanese" => line, "english" => english}
     end
   end
 
-  @spec log_gaps([String.t()], map(), String.t()) :: :ok
-  defp log_gaps(sources, englishes, label) do
+  @spec echoed_or_missing?(String.t(), String.t() | nil) :: boolean()
+  defp echoed_or_missing?(_line, nil), do: true
+  defp echoed_or_missing?(line, english), do: normalise(english) == normalise(line)
+
+  @spec log_gaps([source_unit()], map(), String.t()) :: :ok
+  defp log_gaps(units, englishes, label) do
+    lines = for {:line, line} <- units, do: line
+
     missing =
-      sources
+      lines
       |> Enum.with_index()
       |> Enum.count(fn {line, index} ->
-        classify(line) != :separator and is_nil(Map.get(englishes, index))
+        english = Map.get(englishes, index)
+
+        is_nil(english) and not separator_line?(line)
       end)
 
     if missing > 0 do
-      warn(label, "#{missing} of #{length(sources)} lines came back untranslated")
+      warn(label, "#{missing} of #{length(lines)} lines came back untranslated")
     end
 
     :ok
@@ -615,13 +681,22 @@ defmodule Japanese.Translation.Json do
 
   ## Text helpers
 
-  @spec classify(String.t()) :: :japanese | :latin | :separator
+  @spec classify(String.t()) :: :japanese | :latin | :separator | :other
   defp classify(line) do
     cond do
       Regex.match?(@japanese_re, line) -> :japanese
       Regex.match?(@latin_re, line) -> :latin
-      true -> :separator
+      separator_line?(line) -> :separator
+      true -> :other
     end
+  end
+
+  # Punctuation alone does not make a separator: 「、、、、、」 has no kana or kanji
+  # and is still a line of dialogue. Only the decorative repertoire counts, and
+  # only in short lines, so prose can never be mistaken for a chapter divider.
+  @spec separator_line?(String.t()) :: boolean()
+  defp separator_line?(line) do
+    String.length(line) <= @separator_max_length and Regex.match?(@separator_re, line)
   end
 
   # Compatibility normalisation plus whitespace removal: the model routinely

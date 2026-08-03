@@ -9,10 +9,10 @@ defmodule Test.Japanese.Translation.Json do
   @moduletag :capture_log
 
   # A real page has leading ideographic spaces, 「」 quotes and full-width digits.
-  # Fixtures made of foo/bar are how a pairing bug ships unnoticed.
+  # Fixtures made of foo/bar are how a pairing bug ships unnoticed. Single blank
+  # lines only, so this page has no paragraph breaks to reason about.
   @source """
   来訪者　②
-
 
   「『救国の乙女』様」
 
@@ -83,8 +83,11 @@ defmodule Test.Japanese.Translation.Json do
 
       assert entries(json) == [
                %{"japanese" => "来訪者　②", "english" => "Visitor ②"},
+               %{"paragraph_break" => true},
                %{"japanese" => "「いらっしゃいますか！！」", "english" => "\"Are you there!!\""},
+               %{"paragraph_break" => true},
                %{"japanese" => "大きな声が聞こえてくる。", "english" => "I hear loud voices."},
+               %{"paragraph_break" => true},
                %{"japanese" => "そんなことを思いながら私は扉を開けた。", "english" => "I opened the door."}
              ]
     end
@@ -106,12 +109,15 @@ defmodule Test.Japanese.Translation.Json do
             |> reply()
             |> Json.format_to_translation_json(@raw_page)
 
-          assert Enum.map(entries(json), & &1["english"]) == [
-                   "Visitor ②",
-                   "\"Are you there!!\"",
-                   "I hear loud voices.",
-                   "I opened the door."
-                 ]
+          assert entries(json)
+                 |> Enum.reject(& &1["paragraph_break"])
+                 |> Enum.map(& &1["english"]) ==
+                   [
+                     "Visitor ②",
+                     "\"Are you there!!\"",
+                     "I hear loud voices.",
+                     "I opened the door."
+                   ]
         end)
 
       refute log =~ "[warning]"
@@ -129,39 +135,6 @@ defmodule Test.Japanese.Translation.Json do
       json = Json.format_to_translation_json(indexed_reply([3, 0, 4, 1, 2]), @source)
 
       assert entries(json) == Enum.map(0..4, &pair/1)
-    end
-
-    test "puts a scene break before the line the marker names, wherever it appears in the reply" do
-      json =
-        ["4\t#{Enum.at(@englishes, 3)}", "!CONTINUED!\t2", "1\t#{Enum.at(@englishes, 0)}"]
-        |> reply()
-        |> Json.format_to_translation_json(@source)
-
-      assert [
-               %{"japanese" => "来訪者　②"},
-               %{"paragraph_break" => true},
-               %{"japanese" => "「『救国の乙女』様」"} | _rest
-             ] = entries(json)
-    end
-
-    test "keeps a scene break that names the first line at the top of the page" do
-      json =
-        (["!CONTINUED!\t1"] ++ Enum.map(0..4, &"#{&1 + 1}\t#{Enum.at(@englishes, &1)}"))
-        |> reply()
-        |> Json.format_to_translation_json(@source)
-
-      assert [%{"paragraph_break" => true} | rest] = entries(json)
-      assert rest == Enum.map(0..4, &pair/1)
-    end
-
-    test "keeps an unnumbered scene break at the end of the page" do
-      json =
-        (Enum.map(0..4, &"#{&1 + 1}\t#{Enum.at(@englishes, &1)}") ++ ["!CONTINUED!"])
-        |> reply()
-        |> Json.format_to_translation_json(@source)
-
-      assert List.last(entries(json)) == %{"paragraph_break" => true}
-      assert length(entries(json)) == 6
     end
 
     test "keeps the first copy when a line number comes back twice" do
@@ -414,20 +387,254 @@ defmodule Test.Japanese.Translation.Json do
 
       assert entries(json) == Enum.map(0..4, &pair/1)
     end
+  end
 
-    test "puts an unnumbered scene break before the next line it can place" do
+  # The paragraph shape of a page is a property of its source text, not of the
+  # reply: one blank line separates lines, a run of two or more is a break.
+  describe "paragraph breaks read off the source text" do
+    test "a single blank line between two lines is not a paragraph break" do
+      json =
+        ["1\tVisitor ②", "2\tI hear loud voices."]
+        |> reply()
+        |> Json.format_to_translation_json("来訪者　②\n\n　大きな声が聞こえてくる。\n")
+
+      assert entries(json) == [
+               %{"japanese" => "来訪者　②", "english" => "Visitor ②"},
+               %{"japanese" => "大きな声が聞こえてくる。", "english" => "I hear loud voices."}
+             ]
+    end
+
+    test "a run of two blank lines is exactly one paragraph break" do
+      json =
+        ["1\tVisitor ②", "2\tI hear loud voices."]
+        |> reply()
+        |> Json.format_to_translation_json("来訪者　②\n\n\n　大きな声が聞こえてくる。\n")
+
+      assert entries(json) == [
+               %{"japanese" => "来訪者　②", "english" => "Visitor ②"},
+               %{"paragraph_break" => true},
+               %{"japanese" => "大きな声が聞こえてくる。", "english" => "I hear loud voices."}
+             ]
+    end
+
+    test "a run of five blank lines is still exactly one paragraph break" do
+      json =
+        ["1\tVisitor ②", "2\tI hear loud voices."]
+        |> reply()
+        |> Json.format_to_translation_json("来訪者　②\n\n\n\n\n\n　大きな声が聞こえてくる。\n")
+
+      assert Enum.count(entries(json), & &1["paragraph_break"]) == 1
+    end
+
+    test "a blank run at the top of the page is not a break above the first line" do
+      json =
+        ["1\tVisitor ②"]
+        |> reply()
+        |> Json.format_to_translation_json("\n\n\n来訪者　②\n")
+
+      assert entries(json) == [%{"japanese" => "来訪者　②", "english" => "Visitor ②"}]
+    end
+
+    test "a blank run at the end of the page is not a break after the last line" do
+      json =
+        ["1\tVisitor ②"]
+        |> reply()
+        |> Json.format_to_translation_json("来訪者　②\n\n\n\n")
+
+      assert entries(json) == [%{"japanese" => "来訪者　②", "english" => "Visitor ②"}]
+    end
+
+    test "a page of one line and no blank runs has no breaks" do
+      json = Json.format_to_translation_json("1\tVisitor ②", "来訪者　②")
+
+      assert entries(json) == [%{"japanese" => "来訪者　②", "english" => "Visitor ②"}]
+    end
+
+    test "a source of nothing but blank lines yields an empty page" do
+      json = Json.format_to_translation_json("", "\n\n\n\n")
+
+      assert entries(json) == []
+    end
+
+    test "a scene marker in the reply cannot add a break the source does not have" do
+      json =
+        ["1\tVisitor ②", "!CONTINUED!\t2", "2\tI hear loud voices."]
+        |> reply()
+        |> Json.format_to_translation_json("来訪者　②\n\n　大きな声が聞こえてくる。\n")
+
+      assert entries(json) == [
+               %{"japanese" => "来訪者　②", "english" => "Visitor ②"},
+               %{"japanese" => "大きな声が聞こえてくる。", "english" => "I hear loud voices."}
+             ]
+    end
+
+    test "a scene marker in the reply cannot move a break the source does have" do
+      json =
+        ["!CONTINUED!", "1\tVisitor ②", "2\tI hear loud voices."]
+        |> reply()
+        |> Json.format_to_translation_json("来訪者　②\n\n\n　大きな声が聞こえてくる。\n")
+
+      assert entries(json) == [
+               %{"japanese" => "来訪者　②", "english" => "Visitor ②"},
+               %{"paragraph_break" => true},
+               %{"japanese" => "大きな声が聞こえてくる。", "english" => "I hear loud voices."}
+             ]
+    end
+  end
+
+  # 「、、、、、」 is a character trailing off into silence. It carries no kana and no
+  # kanji, so a script test calls it a separator glyph and drops it — taking its
+  # translation with it and unpairing everything after it. It is real dialogue,
+  # it is in the source, and one line like it lives in a real production page.
+  describe "a line of punctuation that is real dialogue" do
+    @silence "「、、、、、」"
+    @silence_page "　男は答えなかった。\n\n#{@silence}\n\n　私は待った。\n"
+
+    test "keeps its translation when the reply is indexed" do
+      json =
+        ["1\tThe man did not answer.", "2\t\".....\"", "3\tI waited."]
+        |> reply()
+        |> Json.format_to_translation_json(@silence_page)
+
+      assert entries(json) == [
+               %{"japanese" => "男は答えなかった。", "english" => "The man did not answer."},
+               %{"japanese" => @silence, "english" => "\".....\""},
+               %{"japanese" => "私は待った。", "english" => "I waited."}
+             ]
+    end
+
+    test "keeps its translation when the model echoes the Japanese back" do
       json =
         [
-          "来訪者　②",
-          "Visitor ②",
-          "!CONTINUED!",
-          "「『救国の乙女』様」",
-          "\"'Maiden of National Salvation'-sama\""
+          "　男は答えなかった。",
+          "The man did not answer.",
+          @silence,
+          "\".....\"",
+          "　私は待った。",
+          "I waited."
         ]
         |> reply()
-        |> Json.format_to_translation_json(@source)
+        |> Json.format_to_translation_json(@silence_page)
 
-      assert Enum.take(entries(json), 3) == [pair(0), %{"paragraph_break" => true}, pair(1)]
+      assert entries(json) == [
+               %{"japanese" => "男は答えなかった。", "english" => "The man did not answer."},
+               %{"japanese" => @silence, "english" => "\".....\""},
+               %{"japanese" => "私は待った。", "english" => "I waited."}
+             ]
+    end
+
+    test "is content, not a separator, with no source text to consult" do
+      json =
+        [@silence, "\".....\"", "　私は待った。", "I waited."]
+        |> reply()
+        |> Json.format_to_translation_json()
+
+      assert entries(json) == [
+               %{"japanese" => @silence, "english" => "\".....\""},
+               %{"japanese" => "私は待った。", "english" => "I waited."}
+             ]
+    end
+
+    test "stays paired even when the model leaves it untranslated" do
+      json =
+        ["1\tThe man did not answer.", "3\tI waited."]
+        |> reply()
+        |> Json.format_to_translation_json(@silence_page)
+
+      assert entries(json) == [
+               %{"japanese" => "男は答えなかった。", "english" => "The man did not answer."},
+               %{"japanese" => @silence, "english" => nil},
+               %{"japanese" => "私は待った。", "english" => "I waited."}
+             ]
+    end
+  end
+
+  # The bug this module exists to kill was a cascade: one wrong line unpaired
+  # every line after it. The invariant that makes a cascade impossible is that a
+  # page has one entry per source line whatever the reply looks like, so damage
+  # can only ever be as wide as the lines that were actually mistranslated.
+  describe "several kinds of drift in one reply" do
+    @page_lines [
+      "来訪者　②",
+      "「『救国の乙女』様」",
+      "「いらっしゃいますか！！」",
+      "大きな声が聞こえてくる。",
+      "「、、、、、」",
+      "私の事を『救国の乙女』と呼ぶ彼らは、私の名前なんて覚えていないのかもしれない。",
+      "そんなことを思いながら私は扉を開けた。",
+      "扉の外には見知らぬ男が立っていた。"
+    ]
+
+    @page_englishes [
+      "Visitor ②",
+      "\"'Maiden of National Salvation'-sama\"",
+      "\"Are you there!!\"",
+      "I hear loud voices.",
+      "\".....\"",
+      "Those who call me the 'Maiden of National Salvation' might not remember my name.",
+      "While thinking such things, I opened the door.",
+      "A man I did not know was standing outside the door."
+    ]
+
+    # Two blank lines after line 4, one blank line everywhere else: one break.
+    @page (@page_lines
+           |> Enum.with_index(1)
+           |> Enum.map(fn
+             {line, 4} -> "　#{line}\n"
+             {line, _n} -> "　#{line}"
+           end)
+           |> Enum.join("\n\n")) <> "\n"
+
+    test "leaves the whole page paired when the model omits, merges, splits, repeats and reorders" do
+      reply =
+        [
+          "8\t#{Enum.at(@page_englishes, 7)}",
+          "6\t#{Enum.at(@page_englishes, 5)}",
+          "5\t#{Enum.at(@page_englishes, 4)}",
+          # merged 3 into 2, so 3 never comes back on its own
+          "2\t#{Enum.at(@page_englishes, 1)} #{Enum.at(@page_englishes, 2)}",
+          # split across two lines, the second unnumbered
+          "7\tWhile thinking such things,",
+          "I opened the door.",
+          # sent twice
+          "1\t#{Enum.at(@page_englishes, 0)}",
+          "1\t#{Enum.at(@page_englishes, 0)}"
+          # line 4 omitted entirely
+        ]
+        |> reply()
+        |> Json.format_to_translation_json(@page)
+
+      assert entries(reply) == [
+               %{"japanese" => Enum.at(@page_lines, 0), "english" => Enum.at(@page_englishes, 0)},
+               %{
+                 "japanese" => Enum.at(@page_lines, 1),
+                 "english" => "#{Enum.at(@page_englishes, 1)} #{Enum.at(@page_englishes, 2)}"
+               },
+               %{"japanese" => Enum.at(@page_lines, 2), "english" => nil},
+               %{"japanese" => Enum.at(@page_lines, 3), "english" => nil},
+               %{"paragraph_break" => true},
+               %{"japanese" => Enum.at(@page_lines, 4), "english" => Enum.at(@page_englishes, 4)},
+               %{"japanese" => Enum.at(@page_lines, 5), "english" => Enum.at(@page_englishes, 5)},
+               %{
+                 "japanese" => Enum.at(@page_lines, 6),
+                 "english" => "While thinking such things, I opened the door."
+               },
+               %{"japanese" => Enum.at(@page_lines, 7), "english" => Enum.at(@page_englishes, 7)}
+             ]
+    end
+
+    test "keeps every source line in its own entry when the model echoes with no indices at all" do
+      reply =
+        @page_lines
+        |> Enum.zip(@page_englishes)
+        |> Enum.flat_map(fn {japanese, english} -> ["　#{japanese}", english] end)
+        |> reply()
+        |> Json.format_to_translation_json(@page)
+
+      pairs = Enum.reject(entries(reply), & &1["paragraph_break"])
+
+      assert Enum.map(pairs, & &1["japanese"]) == @page_lines
+      assert Enum.map(pairs, & &1["english"]) == @page_englishes
     end
   end
 
@@ -571,6 +778,37 @@ defmodule Test.Japanese.Translation.Json do
 
       assert length(decoded.translation) == 200
       assert microseconds < 1_000_000
+    end
+
+    # Pretty printing is a per-environment setting, so the corpus holds both
+    # styles: production files are one minified line with no trailing newline.
+    test "decodes a minified production file the same as an indented one" do
+      entries = [
+        {"来訪者　②", "Visitor ②"},
+        :paragraph_break,
+        {"大きな声が聞こえてくる。", "I hear loud voices."}
+      ]
+
+      assert {:ok, minified} = Json.decode_translation(OldTranslation.minified_page(entries))
+      assert {:ok, indented} = Json.decode_translation(OldTranslation.page(entries))
+
+      assert minified == indented
+
+      assert minified.translation == [
+               %{english: "Visitor ②", japanese: "来訪者　②"},
+               %{paragraph_break: true},
+               %{english: "I hear loud voices.", japanese: "大きな声が聞こえてくる。"}
+             ]
+    end
+
+    test "does not care what order the keys are written in" do
+      japanese_first =
+        ~s({"translation":[{"japanese":"来訪者　②","english":"Visitor ②"}],"title":"TODO"})
+
+      english_first =
+        ~s({"title":"TODO","translation":[{"english":"Visitor ②","japanese":"来訪者　②"}]})
+
+      assert Json.decode_translation(japanese_first) == Json.decode_translation(english_first)
     end
 
     test "reports an unknown key once, not once per entry" do

@@ -40,6 +40,18 @@ defmodule JapaneseWeb.CoreComponents.PageTest do
     refute html =~ "tr-eng"
   end
 
+  # A line of punctuation can be dialogue: 「、、、、、」 is a character trailing off
+  # into silence, and it renders as a pair like any other line, not a divider.
+  test "renders a line of nothing but punctuation as dialogue, not a divider" do
+    html = render_entries([%{japanese: "「、、、、、」", english: "\".....\""}])
+
+    assert html =~ "tr-ja"
+    assert html =~ "tr-eng"
+    assert html =~ "「、、、、、」"
+    refute html =~ "tr-sep"
+    refute html =~ "not translated"
+  end
+
   test "renders a paragraph break as blank space" do
     html = render_entries([%{paragraph_break: true}])
 

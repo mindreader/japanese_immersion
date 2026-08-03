@@ -10,7 +10,7 @@ These rules override any earlier instruction about keeping the input's format:
 - Do not echo the Japanese back. Do not repeat the numbers in any other form, and do not add quotes, bullets, markdown or commentary.
 - Emit exactly one reply line for every numbered input line, in ascending order. Do not merge two input lines into one reply line, do not split one input line across two reply lines, do not skip a line, and do not invent a line number that was not in the input.
 - A line that is only a separator glyph (for example ◇◆◇, ＊＊＊, ―――, ※ or ……) still gets its own reply line: repeat the glyph as its translation.
-- When a scene transition is sensed between two lines, add a line of its own containing !CONTINUED! followed by a TAB and the number of the line that begins the new scene. Never write !CONTINUED! without a line number.
+- Do not mark paragraphs or scene transitions in any way; the blank lines of the input already say where they are.
 - Reply with nothing but these lines: no preamble, no summary, no blank lines.
 
 For example, when presented with the following text:
@@ -32,7 +32,6 @@ For example, when presented with the following text:
 You should reply with exactly this and nothing else:
 
 1	Twenty years have passed in my life ①
-!CONTINUED!	2
 2	"Phew..."
 3	I take a breather after watering the crops I'm growing in the field behind my house.
 4	The house I live in exists all alone in the forest. I live alone, but it's a single-story house with six rooms and sufficient space. A brick house with a red roof. Defensive magic has been applied to it, and it's said that it won't break easily under normal circumstances.

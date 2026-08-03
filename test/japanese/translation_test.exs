@@ -231,11 +231,11 @@ defmodule Test.Japanese.Translation do
       assert_received {:translation_json, json}
 
       # The model never translated the last line, so that line — and only that
-      # line — is left visibly untranslated.
+      # line — is left visibly untranslated. Its stray scene marker changes
+      # nothing: the source has no blank run of two, so the page has no break.
       assert Jason.decode!(json)["translation"] == [
                %{"japanese" => "来訪者　②", "english" => "Visitor ②"},
                %{"separator" => "◇◆◇"},
-               %{"paragraph_break" => true},
                %{"japanese" => "大きな声が聞こえてくる。", "english" => "I hear loud voices."},
                %{"japanese" => "そんなことを思いながら私は扉を開けた。", "english" => nil}
              ]
