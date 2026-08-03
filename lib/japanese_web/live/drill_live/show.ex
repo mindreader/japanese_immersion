@@ -22,7 +22,7 @@ defmodule JapaneseWeb.DrillLive.Show do
      |> assign(:revealed, false)
      |> assign(:explanation, nil)
      |> assign(:explaining, false)
-     |> assign(:explain_task_ref, nil)}
+     |> assign(:explain_task, nil)}
   end
 
   @impl Phoenix.LiveView
@@ -73,7 +73,7 @@ defmodule JapaneseWeb.DrillLive.Show do
     }
 
     task =
-      Task.async(fn ->
+      Task.Supervisor.async_nolink(Japanese.TaskSupervisor.name(), fn ->
         case Japanese.Translation.explain_form(payload) do
           {:error, reason} ->
             {:error, "Failed to generate explanation: #{inspect(reason)}"}
@@ -86,17 +86,21 @@ defmodule JapaneseWeb.DrillLive.Show do
     {:noreply,
      socket
      |> assign(:explaining, true)
-     |> assign(:explain_task_ref, task.ref)}
+     |> assign(:explain_task, task)}
   end
 
   def handle_event("cancel_explain", _params, socket) do
-    # Can't cleanly cancel a Task.async — just stop listening for its result.
-    {:noreply, socket |> assign(:explaining, false) |> assign(:explain_task_ref, nil)}
+    case socket.assigns.explain_task do
+      %Task{} = task -> Task.Supervisor.terminate_child(Japanese.TaskSupervisor.name(), task.pid)
+      nil -> :ok
+    end
+
+    {:noreply, socket |> assign(:explaining, false) |> assign(:explain_task, nil)}
   end
 
   @impl Phoenix.LiveView
   def handle_info({ref, result}, socket) when is_reference(ref) do
-    if ref == socket.assigns.explain_task_ref do
+    if explain_task_ref(socket) == ref do
       Process.demonitor(ref, [:flush])
 
       explanation =
@@ -114,16 +118,20 @@ defmodule JapaneseWeb.DrillLive.Show do
       {:noreply,
        socket
        |> assign(:explaining, false)
-       |> assign(:explain_task_ref, nil)
+       |> assign(:explain_task, nil)
        |> assign(:explanation, explanation)}
     else
       {:noreply, socket}
     end
   end
 
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, socket) do
-    if ref == socket.assigns.explain_task_ref do
-      {:noreply, socket |> assign(:explaining, false) |> assign(:explain_task_ref, nil)}
+  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) do
+    if explain_task_ref(socket) == ref do
+      {:noreply,
+       socket
+       |> assign(:explaining, false)
+       |> assign(:explain_task, nil)
+       |> assign(:explanation, "Failed to generate explanation: #{inspect(reason)}")}
     else
       {:noreply, socket}
     end
@@ -133,7 +141,14 @@ defmodule JapaneseWeb.DrillLive.Show do
     socket
     |> assign(:explanation, nil)
     |> assign(:explaining, false)
-    |> assign(:explain_task_ref, nil)
+    |> assign(:explain_task, nil)
+  end
+
+  defp explain_task_ref(socket) do
+    case socket.assigns.explain_task do
+      %Task{ref: ref} -> ref
+      nil -> nil
+    end
   end
 
   defp current(%{history: history, cursor: cursor}), do: Enum.at(history, cursor)

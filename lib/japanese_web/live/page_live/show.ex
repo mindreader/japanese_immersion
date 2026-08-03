@@ -9,7 +9,7 @@ defmodule JapaneseWeb.PageLive.Show do
        selected_text: nil,
        explaining: false,
        explanation: nil,
-       explain_task_ref: nil,
+       explain_task: nil,
        translation_status: nil
      )}
   end
@@ -102,7 +102,7 @@ defmodule JapaneseWeb.PageLive.Show do
   @impl Phoenix.LiveView
   def handle_info({ref, result}, socket) when is_reference(ref) do
     # Task completed successfully
-    if ref == socket.assigns.explain_task_ref do
+    if explain_task_ref(socket) == ref do
       Process.demonitor(ref, [:flush])
 
       explanation =
@@ -121,7 +121,7 @@ defmodule JapaneseWeb.PageLive.Show do
       {:noreply,
        socket
        |> assign(:explaining, false)
-       |> assign(:explain_task_ref, nil)
+       |> assign(:explain_task, nil)
        |> assign(:explanation, explanation)}
     else
       {:noreply, socket}
@@ -129,13 +129,14 @@ defmodule JapaneseWeb.PageLive.Show do
   end
 
   @impl Phoenix.LiveView
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, socket) do
+  def handle_info({:DOWN, ref, :process, _pid, reason}, socket) do
     # Task crashed or was killed
-    if ref == socket.assigns.explain_task_ref do
+    if explain_task_ref(socket) == ref do
       {:noreply,
        socket
        |> assign(:explaining, false)
-       |> assign(:explain_task_ref, nil)}
+       |> assign(:explain_task, nil)
+       |> assign(:explanation, "Failed to generate explanation: #{inspect(reason)}")}
     else
       {:noreply, socket}
     end
@@ -153,9 +154,10 @@ defmodule JapaneseWeb.PageLive.Show do
 
   @impl Phoenix.LiveView
   def handle_event("start_explain", %{"text" => selected_text}, socket) do
-    # Spawn async task to get explanation from LLM
+    # Spawn a supervised, non-linked task to get an explanation from the LLM
+    # so a crash in the HTTP call doesn't take the LiveView process down.
     task =
-      Task.async(fn ->
+      Task.Supervisor.async_nolink(Japanese.TaskSupervisor.name(), fn ->
         case Japanese.Translation.explain_text(selected_text) do
           {:error, reason} ->
             {:error, "Failed to generate explanation: #{inspect(reason)}"}
@@ -169,21 +171,20 @@ defmodule JapaneseWeb.PageLive.Show do
      socket
      |> assign(:selected_text, selected_text)
      |> assign(:explaining, true)
-     |> assign(:explain_task_ref, task.ref)}
+     |> assign(:explain_task, task)}
   end
 
   @impl Phoenix.LiveView
   def handle_event("cancel_explain", _params, socket) do
-    # Cancel the task if it exists
-    if socket.assigns.explain_task_ref do
-      # We can't easily cancel a Task.async, but we can ignore its result
-      # by removing the ref from state
+    case socket.assigns.explain_task do
+      %Task{} = task -> Task.Supervisor.terminate_child(Japanese.TaskSupervisor.name(), task.pid)
+      nil -> :ok
     end
 
     {:noreply,
      socket
      |> assign(:explaining, false)
-     |> assign(:explain_task_ref, nil)}
+     |> assign(:explain_task, nil)}
   end
 
   @impl Phoenix.LiveView
@@ -196,5 +197,12 @@ defmodule JapaneseWeb.PageLive.Show do
     Japanese.Translation.Service.clear_error(page)
     Japanese.Translation.Service.translate_page(page)
     {:noreply, assign(socket, :translation_status, :in_progress)}
+  end
+
+  defp explain_task_ref(socket) do
+    case socket.assigns.explain_task do
+      %Task{ref: ref} -> ref
+      nil -> nil
+    end
   end
 end
