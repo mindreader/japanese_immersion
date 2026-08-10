@@ -11,8 +11,8 @@ defmodule Test.Japanese.Translation.Service do
   @key {"test_story", 1}
 
   describe "Server.init/1" do
-    test "initializes with empty statuses" do
-      assert {:ok, %{statuses: %{}}} = Server.init(%{})
+    test "initializes with empty statuses and no tracked tasks" do
+      assert {:ok, %{statuses: %{}, tasks: %{}}} = Server.init(%{})
     end
   end
 
@@ -57,13 +57,14 @@ defmodule Test.Japanese.Translation.Service do
     end
 
     test "sets status to in_progress and broadcasts translation_started" do
-      state = %{statuses: %{}}
+      state = %{statuses: %{}, tasks: %{}}
 
       Phoenix.PubSub.subscribe(Japanese.PubSub, "story:test_story:page:1")
 
       {:noreply, new_state} = Server.handle_cast({:translate_page, @page}, state)
 
       assert new_state.statuses[@key] == :in_progress
+      assert map_size(new_state.tasks) == 1
       assert_receive {:translation_started, %{story: "test_story", page: 1}}
     end
   end
@@ -85,23 +86,36 @@ defmodule Test.Japanese.Translation.Service do
     end
   end
 
+  # Builds a state with a single tracked task keyed by `ref`, as the server
+  # would hold while a translation is running. A live (but harmless) timer is
+  # armed so the success/error/crash paths exercise real timer cancellation.
+  defp state_with_task(ref) do
+    timer = Process.send_after(self(), {:translation_timeout, ref}, 60_000)
+
+    %{
+      statuses: %{@key => :in_progress},
+      tasks: %{ref => %{key: @key, page: @page, pid: self(), timer: timer}}
+    }
+  end
+
   describe "Server.handle_info task success" do
     @tag capture_log: true
-    test "clears status on successful translation" do
-      state = %{statuses: %{@key => :in_progress}}
+    test "clears status and forgets the task on successful translation" do
       ref = make_ref()
+      state = state_with_task(ref)
 
       {:noreply, new_state} = Server.handle_info({ref, {@key, @page, :ok}}, state)
 
       assert new_state.statuses == %{}
+      assert new_state.tasks == %{}
     end
   end
 
   describe "Server.handle_info task error" do
     @tag capture_log: true
-    test "sets error status and broadcasts translation_failed" do
-      state = %{statuses: %{@key => :in_progress}}
+    test "sets error status, forgets the task, and broadcasts translation_failed" do
       ref = make_ref()
+      state = state_with_task(ref)
 
       Phoenix.PubSub.subscribe(Japanese.PubSub, "story:test_story:page:1")
 
@@ -109,17 +123,65 @@ defmodule Test.Japanese.Translation.Service do
         Server.handle_info({ref, {@key, @page, {:error, :api_error}}}, state)
 
       assert new_state.statuses[@key] == {:error, :api_error}
+      assert new_state.tasks == %{}
       assert_receive {:translation_failed, %{story: "test_story", page: 1, reason: :api_error}}
     end
   end
 
   describe "Server.handle_info task crash" do
     @tag capture_log: true
-    test "logs error on task crash" do
-      state = %{statuses: %{@key => :in_progress}}
+    test "attributes the crash to its page, records a retryable error, and notifies" do
+      ref = make_ref()
+      state = state_with_task(ref)
 
-      {:noreply, ^state} =
-        Server.handle_info({:DOWN, make_ref(), :process, self(), :killed}, state)
+      Phoenix.PubSub.subscribe(Japanese.PubSub, "story:test_story:page:1")
+
+      {:noreply, new_state} =
+        Server.handle_info({:DOWN, ref, :process, self(), :killed}, state)
+
+      assert new_state.statuses[@key] == {:error, :crashed}
+      assert new_state.tasks == %{}
+      assert_receive {:translation_failed, %{story: "test_story", page: 1, reason: :crashed}}
+    end
+
+    @tag capture_log: true
+    test "ignores a DOWN for a ref it no longer tracks" do
+      state = %{statuses: %{}, tasks: %{}}
+
+      assert {:noreply, ^state} =
+               Server.handle_info({:DOWN, make_ref(), :process, self(), :normal}, state)
+    end
+  end
+
+  describe "Server.handle_info translation timeout" do
+    @tag capture_log: true
+    test "records :timeout, forgets the task, and notifies when the ceiling fires" do
+      ref = make_ref()
+      state = state_with_task(ref)
+
+      Phoenix.PubSub.subscribe(Japanese.PubSub, "story:test_story:page:1")
+
+      {:noreply, new_state} = Server.handle_info({:translation_timeout, ref}, state)
+
+      assert new_state.statuses[@key] == {:error, :timeout}
+      assert new_state.tasks == %{}
+      assert_receive {:translation_failed, %{story: "test_story", page: 1, reason: :timeout}}
+    end
+
+    test "ignores a stale timeout for a task that already finished" do
+      state = %{statuses: %{}, tasks: %{}}
+
+      assert {:noreply, ^state} =
+               Server.handle_info({:translation_timeout, make_ref()}, state)
+    end
+  end
+
+  describe "Server.handle_info catch-all" do
+    @tag capture_log: true
+    test "logs and ignores an unrecognised message" do
+      state = %{statuses: %{}, tasks: %{}}
+
+      assert {:noreply, ^state} = Server.handle_info(:something_unexpected, state)
     end
   end
 end

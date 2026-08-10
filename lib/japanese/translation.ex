@@ -41,6 +41,28 @@ defmodule Japanese.Translation do
   @reading_min_tokens 512
   @reading_max_tokens 4096
 
+  # How long a single HTTP call to Anthropic may stall before Req gives up and
+  # returns `{:error, %Req.TransportError{reason: :timeout}}`. This used to be a
+  # flat 10 minutes, which is where the "it started translating and never
+  # finished, minutes went by" symptom came from: a stalled request sat here for
+  # the full window while the async status stayed pinned at :in_progress. Three
+  # minutes is comfortably longer than a healthy whole-page translation takes,
+  # and a stall now surfaces as a retryable error fast instead of hanging.
+  # Override with `config :japanese, Japanese.Translation, receive_timeout: ms`.
+  # It deliberately sits *under* `Japanese.Translation.Service.timeout_ms/0` (the
+  # async hard ceiling), so a stalled request fails cleanly on its own before the
+  # supervisor has to kill the task out from under it.
+  @default_receive_timeout 180_000
+
+  # Transient failures worth another immediate attempt. A connection dropped,
+  # reset or refused mid-flight is usually gone by the next try; Anthropic's 5xx
+  # and 529 ("overloaded") are load signals that clear on their own, so those
+  # retry after a short backoff. A `:timeout` is deliberately NOT retryable: it
+  # has already cost the full receive window, and retrying would blow the async
+  # time budget instead of promptly surfacing a retryable error to the user.
+  @retryable_transport [:closed, :econnrefused, :econnreset, :nxdomain]
+  @retryable_status [500, 502, 503, 529]
+
   @type ja_to_en_opts :: [
           literalness: :literal | :natural,
           translation_notes: boolean(),
@@ -248,13 +270,31 @@ defmodule Japanese.Translation do
     # newline makes the labelled structure below harder to read, not easier.
     user = "Sentence: #{String.trim(context)}\nSelected portion: #{String.trim(selection)}"
 
+    # Log exactly what reached the backend and what came back. Readings were
+    # "often wrong" with nothing to inspect: a successful-but-wrong reading
+    # logged nothing at all (only the {:error, _} path did, at the caller), so
+    # there was no way to tell whether the sentence context even arrived or
+    # whether the model simply guessed. This makes both the request (selection
+    # + surrounding sentence) and the outcome visible for after-the-fact review.
+    Logger.info(
+      "reading_for request: selection=#{inspect(String.trim(selection))} " <>
+        "context=#{inspect(String.trim(context))}"
+    )
+
     max_tokens = reading_max_tokens(selection)
 
-    case call_anthropix(system_prompt, user, :reading, max_tokens: max_tokens)
-         |> handle_response(:reading) do
-      {:error, reason} -> {:error, reason}
-      text when is_binary(text) -> if unknown_reply?(text), do: :unknown, else: {:ok, text}
-    end
+    result =
+      case call_anthropix(system_prompt, user, :reading, max_tokens: max_tokens)
+           |> handle_response(:reading) do
+        {:error, reason} -> {:error, reason}
+        text when is_binary(text) -> if unknown_reply?(text), do: :unknown, else: {:ok, text}
+      end
+
+    Logger.info(
+      "reading_for result: selection=#{inspect(String.trim(selection))} → #{inspect(result)}"
+    )
+
+    result
   end
 
   @spec reading_max_tokens(String.t()) :: pos_integer()
@@ -373,13 +413,16 @@ defmodule Japanese.Translation do
   end
 
   defp build_client do
-    api_key = Application.fetch_env!(:japanese, __MODULE__)[:api_key]
+    config = Application.fetch_env!(:japanese, __MODULE__)
+    api_key = config[:api_key]
 
     if is_nil(api_key) do
       raise "ANTHROPIC_API_KEY is not set in config or environment"
     end
 
-    Anthropix.init(api_key, receive_timeout: 600_000)
+    receive_timeout = Keyword.get(config, :receive_timeout, @default_receive_timeout)
+
+    Anthropix.init(api_key, receive_timeout: receive_timeout)
   end
 
   defp call_anthropix(system_prompt, user_text, operation, opts \\ []) do
@@ -407,8 +450,15 @@ defmodule Japanese.Translation do
             {:error, :invalid_response}
         end
 
-      {:error, %Req.TransportError{reason: :closed}} = error ->
-        if retry > 0 do
+      {:error, error} ->
+        if retry > 0 and retryable?(error) do
+          Logger.warning(
+            "Anthropic call failed (#{operation}), retrying (#{retry} attempt(s) left): " <>
+              inspect(error)
+          )
+
+          retry_backoff(error)
+
           call_anthropix(
             system_prompt,
             user_text,
@@ -416,13 +466,21 @@ defmodule Japanese.Translation do
             Keyword.put(opts, :retries, retry - 1)
           )
         else
-          error
+          {:error, error}
         end
-
-      {:error, err} ->
-        {:error, err}
     end
   end
+
+  @spec retryable?(term()) :: boolean()
+  defp retryable?(%Req.TransportError{reason: reason}), do: reason in @retryable_transport
+  defp retryable?(%Anthropix.APIError{status: status}), do: status in @retryable_status
+  defp retryable?(_), do: false
+
+  # A connection-level failure is already gone, so retry it straight away; an
+  # overloaded/5xx server needs a beat to recover before we ask again.
+  @spec retry_backoff(term()) :: :ok
+  defp retry_backoff(%Anthropix.APIError{}), do: Process.sleep(1_000)
+  defp retry_backoff(_), do: :ok
 
   # Response validation failing means the raw API payload had some shape we
   # didn't expect (the three known triggers were: a blank text field, a
