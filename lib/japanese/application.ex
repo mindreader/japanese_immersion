@@ -13,7 +13,20 @@ defmodule Japanese.Application do
       JapaneseWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:japanese, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Japanese.PubSub},
-      {Finch, name: Japanese.Finch},
+      {Finch,
+       name: Japanese.Finch,
+       pools: %{
+         # Recycle idle HTTP/1 keep-alive connections well before Anthropic (or
+         # any intermediary load balancer / NAT / firewall) silently drops an
+         # idle socket. Finch's default conn_max_idle_time is :infinity, so a
+         # dead connection lingers in the pool; the next request is written into
+         # the half-open socket, never reaches the server (so it never appears in
+         # Anthropic's logs), and fails only when receive_timeout expires as
+         # %Req.TransportError{reason: :timeout}. 30s is safely under typical
+         # server keep-alive windows (60-120s). This pool backs the Anthropic
+         # client (see Japanese.Translation) as well as Hume/Fal/storage.
+         default: [conn_max_idle_time: :timer.seconds(30)]
+       }},
       {Task.Supervisor, name: Japanese.Task.Supervisor},
       {Japanese.Translation.Service.Server, name: Japanese.Translation.Service},
 
