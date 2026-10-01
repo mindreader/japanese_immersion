@@ -20,6 +20,12 @@ defmodule Japanese.Games.DeckWatcher do
   recorded for that Deck are queued; on the very first connection only the
   latest `initial_backfill` (default 3) are, not the Deck's whole history.
 
+  Nothing taken more than `max_age_days` (default 7) ago is ever queued
+  automatically, by catch-up or by a new-file event, so losing the stored
+  shots (or a fresh install) can't turn into processing years of old
+  screenshots. Age comes from Steam's file name (Deck local time), against
+  this machine's local clock. A shot can still be imported by hand.
+
   When the Deck sleeps, SSH's keepalives end the session within ~30s and the
   watcher goes back to polling.
 
@@ -29,7 +35,8 @@ defmodule Japanese.Games.DeckWatcher do
   (with ssh's own output), not one per retry.
 
   Config (`config :japanese, Japanese.Games.DeckWatcher`): `:enabled`
-  (default true; off in tests), `:poll_interval`, `:initial_backfill`.
+  (default true; off in tests), `:poll_interval`, `:initial_backfill`,
+  `:max_age_days`.
   """
 
   use GenServer
@@ -83,9 +90,14 @@ defmodule Japanese.Games.DeckWatcher do
   Which of the Deck's existing screenshots to queue when (re)connecting:
   those newer than the newest shot already recorded for that Deck, or — if
   there are none — just the latest `backfill`. Oldest first.
+
+  Only shots taken at or after `cutoff` (a `YYYYMMDDHHMMSS` stamp, see
+  `cutoff/1`) are considered at all; a file whose name carries no
+  timestamp can't be dated, so it is skipped too. `nil` means no cutoff.
   """
-  @spec catch_up([String.t()], [Shot.t()], String.t(), non_neg_integer()) :: [String.t()]
-  def catch_up(paths, shots, deck_name, backfill) do
+  @spec catch_up([String.t()], [Shot.t()], String.t(), non_neg_integer(), String.t() | nil) ::
+          [String.t()]
+  def catch_up(paths, shots, deck_name, backfill, cutoff \\ nil) do
     candidates =
       paths
       |> Enum.flat_map(fn path ->
@@ -94,6 +106,7 @@ defmodule Japanese.Games.DeckWatcher do
           :error -> []
         end
       end)
+      |> Enum.filter(fn {stamp, _} -> cutoff == nil or recent?(stamp, cutoff) end)
       |> Enum.sort()
 
     newest_known =
@@ -107,6 +120,28 @@ defmodule Japanese.Games.DeckWatcher do
       newest -> Enum.filter(candidates, fn {stamp, _} -> stamp > newest end)
     end
     |> Enum.map(&elem(&1, 1))
+  end
+
+  @doc """
+  The `YYYYMMDDHHMMSS` stamp `max_age_days` before `now` (local time).
+  """
+  @spec cutoff(NaiveDateTime.t()) :: String.t()
+  def cutoff(now \\ NaiveDateTime.local_now()) do
+    now
+    |> NaiveDateTime.add(-config(:max_age_days, 7) * 86_400, :second)
+    |> Calendar.strftime("%Y%m%d%H%M%S")
+  end
+
+  @doc """
+  Whether a screenshot file name (or its stem) was taken at or after
+  `cutoff`. False when the name has no Steam timestamp.
+  """
+  @spec recent?(String.t(), String.t()) :: boolean()
+  def recent?(name, cutoff) do
+    case Regex.run(~r/^\d{14}/, Path.basename(name)) do
+      [stamp] -> stamp >= cutoff
+      nil -> false
+    end
   end
 
   # --- GenServer ---
@@ -252,8 +287,18 @@ defmodule Japanese.Games.DeckWatcher do
   end
 
   defp handle_line("NEW " <> path, state) do
-    if Path.basename(Path.dirname(path)) == "screenshots" do
-      Processor.enqueue_deck(state.deck, path)
+    cond do
+      Path.basename(Path.dirname(path)) != "screenshots" ->
+        :ok
+
+      # A file can be "new" here and still old: moved in, restored, or
+      # re-synced by Steam. One with no timestamp in its name was just
+      # written, so it goes through.
+      Regex.match?(~r/^\d{14}/, Path.basename(path)) and not recent?(path, cutoff()) ->
+        Logger.info("Deck watcher: skipping #{Path.basename(path)}, older than #{max_age()} days")
+
+      true ->
+        Processor.enqueue_deck(state.deck, path)
     end
 
     state
@@ -265,8 +310,21 @@ defmodule Japanese.Games.DeckWatcher do
     Logger.info("Steam Deck connected: #{deck.name} (#{deck.address})")
     Games.broadcast({:deck_status, {:connected, deck.name}})
 
+    cutoff = cutoff()
+
+    old =
+      Enum.count(state.existing, fn path ->
+        Processor.parse_remote_path(path) != :error and not recent?(path, cutoff)
+      end)
+
+    if old > 0 do
+      Logger.info(
+        "Deck watcher: ignoring #{old} screenshot(s) on #{deck.name} older than #{max_age()} days"
+      )
+    end
+
     state.existing
-    |> catch_up(Games.list_shots(), deck.name, config(:initial_backfill, 3))
+    |> catch_up(Games.list_shots(), deck.name, config(:initial_backfill, 3), cutoff)
     |> Enum.each(&Processor.enqueue_deck(deck, &1))
 
     %{
@@ -317,6 +375,8 @@ defmodule Japanese.Games.DeckWatcher do
     Process.send_after(self(), :poll, after_ms || config(:poll_interval, 15_000))
     state
   end
+
+  defp max_age, do: config(:max_age_days, 7)
 
   defp config(key, default) do
     Keyword.get(Application.get_env(:japanese, __MODULE__, []), key, default)

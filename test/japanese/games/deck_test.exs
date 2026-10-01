@@ -86,6 +86,41 @@ defmodule Japanese.Games.DeckTest do
       assert DeckWatcher.catch_up(all, known, "steamdeckprime", 2) ==
                paths(~w(20261001090000_2 20261001100000_1))
     end
+
+    test "nothing older than the cutoff, even with no shots known yet" do
+      all = paths(~w(20250101000000_1 20260920000000_1 20260925120000_1 20261001100000_1))
+
+      assert DeckWatcher.catch_up(all, [], "steamdeckprime", 3, "20260924100000") ==
+               paths(~w(20260925120000_1 20261001100000_1))
+    end
+
+    test "the cutoff also applies after a gap since the newest known shot" do
+      all = paths(~w(20260801000000_1 20260920000000_1 20261001100000_1))
+      known = [Shot.new("steamdeckprime", "1718570", "20260701000000_1.jpg")]
+
+      assert DeckWatcher.catch_up(all, known, "steamdeckprime", 3, "20260924100000") ==
+               paths(~w(20261001100000_1))
+    end
+
+    test "a name without a timestamp is skipped when there's a cutoff" do
+      all = [@base <> "custom.jpg" | paths(~w(20261001100000_1))]
+
+      assert DeckWatcher.catch_up(all, [], "steamdeckprime", 3, "20260924100000") ==
+               paths(~w(20261001100000_1))
+    end
+  end
+
+  describe "cutoff/1 and recent?/2" do
+    test "the cutoff is seven days before now" do
+      assert DeckWatcher.cutoff(~N[2026-10-01 10:00:00]) == "20260924100000"
+    end
+
+    test "recent? compares Steam's timestamp, inclusively" do
+      assert DeckWatcher.recent?("/r/1/screenshots/20260924100000_1.jpg", "20260924100000")
+      assert DeckWatcher.recent?("20261001083845_2", "20260924100000")
+      refute DeckWatcher.recent?("20260924095959_1.jpg", "20260924100000")
+      refute DeckWatcher.recent?("custom.jpg", "20260924100000")
+    end
   end
 
   describe "connection logging" do
