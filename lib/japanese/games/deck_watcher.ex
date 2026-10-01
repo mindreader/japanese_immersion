@@ -115,6 +115,12 @@ defmodule Japanese.Games.DeckWatcher do
   def init(_opts) do
     # So terminate/2 runs on shutdown and closes the SSH session cleanly.
     Process.flag(:trap_exit, true)
+
+    case Deck.ssh_key() |> Deck.key_problem() do
+      nil -> :ok
+      problem -> Logger.warning("Deck watcher: SSH key problem: #{problem}")
+    end
+
     send(self(), :poll)
     {:ok, initial_state()}
   end

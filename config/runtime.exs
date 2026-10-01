@@ -30,6 +30,11 @@ config :japanese, Japanese.Fal, api_key: System.get_env("FAL_API_KEY")
 # Vision API). Without it, screenshots are still found but fail to process.
 config :japanese, Japanese.Games.Vision, api_key: System.get_env("GOOGLE_VISION_API_KEY")
 
+# Private key for SSH to the Steam Deck (its public half goes in the Deck's
+# ~/.ssh/authorized_keys). Unset: ~/.ssh/steamdeck_ed25519 if it exists,
+# otherwise ssh's defaults. See Japanese.Games.Deck.
+config :japanese, Japanese.Games.Deck, ssh_key: System.get_env("DECK_SSH_KEY")
+
 if config_env() != :test do
   config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
 

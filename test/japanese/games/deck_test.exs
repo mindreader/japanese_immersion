@@ -152,4 +152,27 @@ defmodule Japanese.Games.DeckTest do
            ) =~
              "app 1718570 (2026-10-01 08:38:45) in 0.1s, 1 line:"
   end
+
+  describe "key_problem/1" do
+    @describetag :tmp_dir
+
+    test "fine for a private file, nil for no key", %{tmp_dir: dir} do
+      key = Path.join(dir, "key")
+      File.write!(key, "x")
+      File.chmod!(key, 0o400)
+
+      assert Deck.key_problem(key) == nil
+      assert Deck.key_problem(nil) == nil
+    end
+
+    test "names a missing file, a non-file and a too-open file", %{tmp_dir: dir} do
+      assert Deck.key_problem(Path.join(dir, "nope")) =~ "cannot read"
+      assert Deck.key_problem(dir) =~ "is not a file"
+
+      key = Path.join(dir, "open")
+      File.write!(key, "x")
+      File.chmod!(key, 0o644)
+      assert Deck.key_problem(key) =~ "readable by group/others (mode 644)"
+    end
+  end
 end
