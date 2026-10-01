@@ -68,3 +68,16 @@
 .markdown-content hr {
   @apply border-t border-zinc-200 my-4;
 }
+
+/* Game screenshot view: English and kana start hidden (guess first) and the
+   toggles reveal them. They are JS.toggle_class on the .game-text container,
+   which LiveView keeps across server updates. */
+.game-text .g-eng,
+.game-text .g-kana {
+  visibility: hidden;
+}
+
+.game-text.show-eng .g-eng,
+.game-text.show-kana .g-kana {
+  visibility: visible;
+}

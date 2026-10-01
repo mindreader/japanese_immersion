@@ -35,6 +35,19 @@ defmodule Japanese.Corpus.StorageLayer do
   @japanese_suffix "j.txt"
   @translation_suffix "tr.yaml"
 
+  # Game screenshot records live inside the corpus directory but are not a
+  # story (see `Japanese.Games`). Every story listing goes through
+  # `list_stories/1`, so skipping it there keeps it out of the index, the
+  # verifier and the boot summary alike.
+  @games_directory "_games"
+
+  @doc """
+  Name of the corpus subdirectory that holds game screenshot records. It is
+  never listed as a story.
+  """
+  @spec games_directory() :: String.t()
+  def games_directory, do: @games_directory
+
   @doc """
   Returns true if the filename is a Japanese page file (e.g., "1j.txt").
   """
@@ -121,7 +134,7 @@ defmodule Japanese.Corpus.StorageLayer do
           entries
           |> Enum.filter(fn entry ->
             path = Path.join(wd, entry)
-            File.dir?(path)
+            entry != @games_directory and File.dir?(path)
           end)
 
         {:ok, stories}

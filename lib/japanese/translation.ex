@@ -9,7 +9,7 @@ defmodule Japanese.Translation do
   ## Model selection
 
   The Anthropic model is configured rather than pinned in code (see `model/1`).
-  We default to the unpinned `"claude-sonnet-5"` alias instead of a dated
+  We default to the unpinned `"claude-sonnet-5-5"` alias (Sonnet 5.5) instead of a dated
   snapshot id: a dated id is perfectly reproducible but eventually gets
   deprecated and starts hard-failing, while an alias keeps working but means
   behaviour can drift underneath us without a code change. For this app's
@@ -24,22 +24,12 @@ defmodule Japanese.Translation do
   # 1M context, which comfortably covers whole-page interleaved translation.
   # Switching to "claude-opus-5" for higher quality is a config-only change
   # (see `model/1`) if this default ever proves insufficient.
-  @default_model "claude-sonnet-5"
+  @default_model "claude-sonnet-5-5"
 
-  # `reading_for/2` scales its output-token ceiling off the length of the
-  # selection instead of pinning one constant: the model's kana reply is
-  # roughly comparable in length to the source text, character for
-  # character (occasionally a bit longer — a single kanji can expand to
-  # several kana), so a fixed small ceiling that's fine for a word starves a
-  # whole-line selection and gets misreported as :truncated. Budgeting a
-  # handful of output tokens per input character gives headroom even though
-  # kana usually maps to more than one token per character under a
-  # byte/subword tokenizer. The floor keeps short selections (a single
-  # kanji, a short word) comfortably above what a bare reading needs; the
-  # cap bounds worst-case cost/latency for a pathological selection.
-  @reading_tokens_per_char 4
-  @reading_min_tokens 512
-  @reading_max_tokens 4096
+  # A busy status/equipment screen came to ~1.9k output tokens on Sonnet 5.5
+  # and ~3.3k on Sonnet 5 in testing; a dialogue box is far less. 8k leaves
+  # room for a dense screen without letting a runaway reply cost much.
+  @screenshot_max_tokens 8192
 
   # How long a single HTTP call to Anthropic may stall before Req gives up and
   # returns `{:error, %Req.TransportError{reason: :timeout}}`. This used to be a
@@ -225,92 +215,42 @@ defmodule Japanese.Translation do
   end
 
   @doc """
-  Looks up the kana reading of a selected word or phrase, as it is actually
-  read within its containing sentence.
+  Transcribes a game screenshot into study text: a short description, the
+  screen's sections, where the pointer is, and per-line Japanese / hiragana /
+  English.
 
-  Kanji readings are context-dependent (e.g. 行った is いった "went" or
-  おこなった "carried out" depending on the sentence), so `context` — the full
-  sentence/line the selection was taken from — is required, not optional.
-  Sending the bare selection alone would let the model guess plausibly and
-  wrongly with no way for the learner to notice.
+  `ocr_lines` is the Google Vision text of the same image, one line per
+  detected paragraph with its pixel box. The model is told the OCR is the
+  authority on which characters are present and to use the image only for
+  layout, grouping and the cursor — see `priv/games/screenshot.txt`.
 
-  This is intentionally tiny and fast: no grammar breakdown, no translation,
-  just the reading. If the model can't determine a confident reading from
-  the given context, or if the response gets cut off before it could finish
-  (a truncated reading is worse than no reading — it looks complete and is
-  silently wrong), this returns `:unknown` or `{:error, reason}` respectively
-  rather than a partial/guessed answer; callers should treat those as
-  distinct "can't tell" cases rather than a real reading.
+  Returns the model's raw reply text (expected to be one JSON object), or an
+  error. Parsing and post-processing live in `Japanese.Games.Transcript`; a
+  reply cut off by `max_tokens` is reported as `{:error, :truncated}` rather
+  than handed on as half a JSON object.
   """
-  @spec reading_for(String.t(), String.t()) :: {:ok, String.t()} | :unknown | {:error, term()}
-  def reading_for(selection, context) when is_binary(selection) and is_binary(context) do
-    system_prompt = """
-    You will be given a Japanese sentence and a word or phrase selected from
-    within it. Reply with ONLY the kana reading of the selected portion,
-    exactly as it is read in that sentence — kanji readings depend on
-    surrounding context, so use the sentence to disambiguate (okurigana,
-    compound readings, names, etc.).
+  @spec transcribe_screenshot(binary(), String.t(), String.t()) ::
+          {:ok, String.t()} | {:error, term()}
+  def transcribe_screenshot(image, media_type, ocr_lines)
+      when is_binary(image) and is_binary(media_type) and is_binary(ocr_lines) do
+    system_prompt = File.read!(Application.app_dir(:japanese, "priv/games/screenshot.txt"))
 
-    Rules:
-    - Use hiragana for kanji and native Japanese vocabulary. If part of the
-      selection is already katakana (loanwords, onomatopoeia, foreign
-      names), keep that part in katakana exactly as written — do not
-      convert it to hiragana, and do not alter the long vowel mark ー.
-    - Reply with kana only. No romaji, no kanji, no translation, no
-      punctuation, no explanation, nothing else.
-    - The selection may be a whole sentence/line, not just a single word —
-      transcribe all of it, not just part of it.
-    - If you cannot determine the reading with reasonable confidence even
-      given the sentence, reply with exactly: unknown
-    """
+    content = [
+      %{
+        type: "image",
+        source: %{type: "base64", media_type: media_type, data: Base.encode64(image)}
+      },
+      %{
+        type: "text",
+        text: "OCR lines, top to bottom (pixel boxes):\n\n" <> ocr_lines
+      }
+    ]
 
-    # Both sides are trimmed here as well as in the client: the context is
-    # captured from a rendered element, so it can arrive carrying the
-    # template's surrounding whitespace, and a sentence that begins with a
-    # newline makes the labelled structure below harder to read, not easier.
-    user = "Sentence: #{String.trim(context)}\nSelected portion: #{String.trim(selection)}"
-
-    # Log exactly what reached the backend and what came back. Readings were
-    # "often wrong" with nothing to inspect: a successful-but-wrong reading
-    # logged nothing at all (only the {:error, _} path did, at the caller), so
-    # there was no way to tell whether the sentence context even arrived or
-    # whether the model simply guessed. This makes both the request (selection
-    # + surrounding sentence) and the outcome visible for after-the-fact review.
-    Logger.info(
-      "reading_for request: selection=#{inspect(String.trim(selection))} " <>
-        "context=#{inspect(String.trim(context))}"
-    )
-
-    max_tokens = reading_max_tokens(selection)
-
-    result =
-      case call_anthropix(system_prompt, user, :reading, max_tokens: max_tokens)
-           |> handle_response(:reading) do
-        {:error, reason} -> {:error, reason}
-        text when is_binary(text) -> if unknown_reply?(text), do: :unknown, else: {:ok, text}
-      end
-
-    Logger.info(
-      "reading_for result: selection=#{inspect(String.trim(selection))} → #{inspect(result)}"
-    )
-
-    result
-  end
-
-  @spec reading_max_tokens(String.t()) :: pos_integer()
-  defp reading_max_tokens(selection) do
-    selection
-    |> String.length()
-    |> Kernel.*(@reading_tokens_per_char)
-    |> max(@reading_min_tokens)
-    |> min(@reading_max_tokens)
-  end
-
-  defp unknown_reply?(text) do
-    text
-    |> String.downcase()
-    |> String.replace(~r/[^\p{L}]/u, "")
-    |> Kernel.==("unknown")
+    case call_anthropix(system_prompt, content, :screenshot, max_tokens: @screenshot_max_tokens)
+         |> handle_response(:screenshot) do
+      {:error, reason} -> {:error, reason}
+      text when is_binary(text) -> {:ok, text}
+    end
   end
 
   @doc """
@@ -358,16 +298,16 @@ defmodule Japanese.Translation do
 
   Configurable via `config :japanese, Japanese.Translation, model: "..."` (a
   shared default) and/or
-  `models: %{ja_to_en: "...", en_to_ja: "...", explain: "...", reading: "..."}`
+  `models: %{ja_to_en: "...", en_to_ja: "...", explain: "...", screenshot: "..."}`
   (a per-operation override). A per-operation entry wins over the shared
   `:model`, which itself falls back to #{inspect(@default_model)} if unset.
 
-  `:reading` is the on-demand hiragana reading lookup (see `reading_for/2`) —
-  a few tokens of output, so a cheaper/faster model is a reasonable override
-  even when the other operations stay on the shared default.
+  `:screenshot` is the game-screenshot transcription (see
+  `transcribe_screenshot/3`). It needs a vision-capable model.
   """
-  @spec model(:ja_to_en | :en_to_ja | :explain | :reading) :: String.t()
-  def model(operation) when operation in [:ja_to_en, :en_to_ja, :explain, :reading] do
+  @spec model(:ja_to_en | :en_to_ja | :explain | :screenshot) :: String.t()
+  def model(operation)
+      when operation in [:ja_to_en, :en_to_ja, :explain, :screenshot] do
     config = Application.get_env(:japanese, __MODULE__, [])
     models = Keyword.get(config, :models, %{})
 
@@ -585,18 +525,18 @@ defmodule Japanese.Translation do
     end
   end
 
-  defp handle_response({:ok, response}, :reading) do
+  defp handle_response({:ok, response}, :screenshot) do
     case first_text(response.content) do
       nil ->
-        log_no_usable_text(response, :reading)
+        log_no_usable_text(response, :screenshot)
         {:error, :no_usable_text}
 
       text ->
-        check_stop_reason(response.stop_reason, response, :reading, text)
+        check_stop_reason(response.stop_reason, response, :screenshot, text)
 
         case response.stop_reason do
           "max_tokens" -> {:error, :truncated}
-          _ -> String.trim(text)
+          _ -> text
         end
     end
   end

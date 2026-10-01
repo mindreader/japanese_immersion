@@ -29,6 +29,10 @@ defmodule Japanese.Application do
        }},
       {Task.Supervisor, name: Japanese.Task.Supervisor},
       {Japanese.Translation.Service.Server, name: Japanese.Translation.Service},
+      # Game screenshots: the queue that OCRs/transcribes them, and the
+      # watcher that finds them on a Steam Deck (a no-op when disabled).
+      Japanese.Games.Processor,
+      Japanese.Games.DeckWatcher,
 
       # Start to serve requests, typically the last entry
       JapaneseWeb.Endpoint

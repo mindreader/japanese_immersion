@@ -11,13 +11,9 @@ defmodule JapaneseWeb.PageLive.Show do
      assign(socket,
        show_translation: false,
        selected_text: nil,
-       selected_context: nil,
        explaining: false,
        explanation: nil,
        explain_task: nil,
-       reading: nil,
-       reading_loading: false,
-       reading_task: nil,
        translation_status: nil
      )}
   end
@@ -133,15 +129,6 @@ defmodule JapaneseWeb.PageLive.Show do
          |> assign(:explain_task, nil)
          |> assign(:explanation, explanation)}
 
-      reading_task_ref(socket) == ref ->
-        Process.demonitor(ref, [:flush])
-
-        {:noreply,
-         socket
-         |> assign(:reading_loading, false)
-         |> assign(:reading_task, nil)
-         |> assign(:reading, result)}
-
       true ->
         {:noreply, socket}
     end
@@ -160,34 +147,19 @@ defmodule JapaneseWeb.PageLive.Show do
          |> assign(:explain_task, nil)
          |> assign(:explanation, TranslationErrors.explain_message(reason))}
 
-      reading_task_ref(socket) == ref ->
-        Logger.warning("Reading task crashed: #{inspect(reason)}")
-
-        {:noreply,
-         socket
-         |> assign(:reading_loading, false)
-         |> assign(:reading_task, nil)
-         |> assign(:reading, {:error, TranslationErrors.reading_message(reason)})}
-
       true ->
         {:noreply, socket}
     end
   end
 
   @impl Phoenix.LiveView
-  def handle_event("text_selected", %{"text" => text} = params, socket) do
-    {:noreply,
-     socket
-     |> assign(:selected_text, text)
-     |> assign(:selected_context, Map.get(params, "context"))}
+  def handle_event("text_selected", %{"text" => text}, socket) do
+    {:noreply, assign(socket, :selected_text, text)}
   end
 
   @impl Phoenix.LiveView
   def handle_event("clear_selection", _params, socket) do
-    {:noreply,
-     socket
-     |> assign(:selected_text, nil)
-     |> assign(:selected_context, nil)}
+    {:noreply, assign(socket, :selected_text, nil)}
   end
 
   @impl Phoenix.LiveView
@@ -231,52 +203,6 @@ defmodule JapaneseWeb.PageLive.Show do
     {:noreply, assign(socket, :explanation, nil)}
   end
 
-  @impl Phoenix.LiveView
-  def handle_event("start_reading", %{"text" => selected_text, "context" => context}, socket) do
-    # Same supervised, non-linked task shape as start_explain — a crash in the
-    # HTTP call must surface an error, not take the LiveView process down.
-    task =
-      Task.Supervisor.async_nolink(Japanese.TaskSupervisor.name(), fn ->
-        case Japanese.Translation.reading_for(selected_text, context) do
-          {:ok, reading} ->
-            {:ok, reading}
-
-          :unknown ->
-            {:unknown, "No confident reading for this context."}
-
-          {:error, reason} ->
-            Logger.warning("Reading lookup failed: #{inspect(reason)}")
-            {:error, TranslationErrors.reading_message(reason)}
-        end
-      end)
-
-    {:noreply,
-     socket
-     |> assign(:selected_text, selected_text)
-     |> assign(:selected_context, context)
-     |> assign(:reading, nil)
-     |> assign(:reading_loading, true)
-     |> assign(:reading_task, task)}
-  end
-
-  @impl Phoenix.LiveView
-  def handle_event("cancel_reading", _params, socket) do
-    case socket.assigns.reading_task do
-      %Task{} = task -> Task.Supervisor.terminate_child(Japanese.TaskSupervisor.name(), task.pid)
-      nil -> :ok
-    end
-
-    {:noreply,
-     socket
-     |> assign(:reading_loading, false)
-     |> assign(:reading_task, nil)}
-  end
-
-  @impl Phoenix.LiveView
-  def handle_event("close_reading", _params, socket) do
-    {:noreply, assign(socket, :reading, nil)}
-  end
-
   def handle_event("retry_translation", _params, socket) do
     page = socket.assigns.page
     Japanese.Translation.Service.clear_error(page)
@@ -284,29 +210,8 @@ defmodule JapaneseWeb.PageLive.Show do
     {:noreply, assign(socket, :translation_status, :in_progress)}
   end
 
-  @doc false
-  @spec reading_display({:ok, String.t()} | {:unknown, String.t()} | {:error, String.t()}) ::
-          String.t()
-  def reading_display({:ok, text}), do: text
-  def reading_display({:unknown, message}), do: message
-  def reading_display({:error, message}), do: message
-
-  @doc false
-  @spec reading_text_class({:ok, String.t()} | {:unknown, String.t()} | {:error, String.t()}) ::
-          String.t()
-  def reading_text_class({:ok, _text}), do: "font-serif text-zinc-900"
-  def reading_text_class({:unknown, _message}), do: "italic text-zinc-500"
-  def reading_text_class({:error, _message}), do: "text-red-600"
-
   defp explain_task_ref(socket) do
     case socket.assigns.explain_task do
-      %Task{ref: ref} -> ref
-      nil -> nil
-    end
-  end
-
-  defp reading_task_ref(socket) do
-    case socket.assigns.reading_task do
       %Task{ref: ref} -> ref
       nil -> nil
     end

@@ -33,6 +33,9 @@ defmodule JapaneseWeb.Router do
     get "/audio-files/:story/:filename", AudioController, :serve
 
     live "/drill", DrillLive.Show, :show
+
+    live "/game", GameLive.Show, :latest
+    live "/game/:id", GameLive.Show, :show
   end
 
   # Other scopes may use custom stacks.

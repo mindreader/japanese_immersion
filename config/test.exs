@@ -21,3 +21,6 @@ config :phoenix_live_view,
 config :japanese, Japanese.Corpus.StorageLayer, corpus_dir: System.tmp_dir!()
 
 config :japanese, Japanese.Translation, api_key: "dummy-key"
+
+# Never look for a real Steam Deck from the test suite.
+config :japanese, Japanese.Games.DeckWatcher, enabled: false

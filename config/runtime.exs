@@ -26,6 +26,10 @@ config :japanese, Japanese.Hume,
 
 config :japanese, Japanese.Fal, api_key: System.get_env("FAL_API_KEY")
 
+# Google Cloud Vision OCR for game screenshots (an API key restricted to the
+# Vision API). Without it, screenshots are still found but fail to process.
+config :japanese, Japanese.Games.Vision, api_key: System.get_env("GOOGLE_VISION_API_KEY")
+
 if config_env() != :test do
   config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
 

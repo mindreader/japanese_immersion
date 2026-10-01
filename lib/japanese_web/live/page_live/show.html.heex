@@ -88,44 +88,6 @@
     >
       Cancel...
     </button>
-    <!-- Reading button - quick contextual kana lookup, distinct from Explain -->
-    <button
-      :if={@selected_text && !@reading_loading && !@reading}
-      id="reading-button"
-      class="rounded-full bg-purple-600 text-white px-6 py-3 shadow-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-400 transition"
-      type="button"
-    >
-      Reading
-    </button>
-    <!-- Cancel button for an in-flight reading lookup -->
-    <button
-      :if={@reading_loading}
-      phx-click="cancel_reading"
-      class="rounded-full bg-orange-500 text-white px-6 py-3 shadow-lg hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 transition"
-      type="button"
-    >
-      Cancel...
-    </button>
-  </div>
-  <!-- Small, quickly-dismissable reading popover — deliberately NOT the big explanation modal -->
-  <div
-    :if={@reading}
-    id="reading-popover"
-    class="fixed bottom-24 right-6 z-50 max-w-xs rounded-lg bg-white shadow-xl border border-zinc-200 p-4"
-  >
-    <div class="flex items-start justify-between gap-4">
-      <div class={["text-lg", reading_text_class(@reading)]}>
-        {reading_display(@reading)}
-      </div>
-      <button
-        phx-click="close_reading"
-        class="text-zinc-400 hover:text-zinc-700 text-sm leading-none"
-        type="button"
-        aria-label="Dismiss reading"
-      >
-        &times;
-      </button>
-    </div>
   </div>
 </div>
 
