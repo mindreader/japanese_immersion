@@ -194,13 +194,33 @@ defmodule Japanese.Games.Processor do
 
   # Runs inside the task.
   defp process(%Shot{} = shot, source) do
+    started = System.monotonic_time(:millisecond)
     processing = %Shot{shot | status: :processing, game: shot.game || game_name(shot, source)}
     {:ok, processing} = Games.save_shot(processing)
     Games.broadcast({:shot_updated, processing})
 
-    with {:ok, image} <- fetch(processing, source) do
-      Pipeline.run(processing, image, media_type(processing.file))
+    Logger.debug(
+      "Processing game screenshot #{processing.id} (#{processing.game || processing.appid})"
+    )
+
+    with {:ok, image} <- fetch(processing, source),
+         {:ok, done} <- Pipeline.run(processing, image, media_type(processing.file)) do
+      Logger.info(processed_message(done, System.monotonic_time(:millisecond) - started))
+      {:ok, done}
     end
+  end
+
+  @doc false
+  # e.g. `Game screenshot processed: ASTLIBRA … (2026-10-01 08:38:45) in 9.8s,
+  # 12 lines: "equipment menu"`
+  @spec processed_message(Shot.t(), non_neg_integer()) :: String.t()
+  def processed_message(%Shot{} = shot, elapsed_ms) do
+    lines = Enum.reduce(shot.sections, 0, &(length(&1["lines"] || []) + &2))
+    seconds = :erlang.float_to_binary(elapsed_ms / 1000, decimals: 1)
+
+    "Game screenshot processed: #{shot.game || "app #{shot.appid}"} (#{shot.taken_at}) " <>
+      "in #{seconds}s, #{lines} #{if lines == 1, do: "line", else: "lines"}: " <>
+      inspect(shot.description)
   end
 
   defp fetch(_shot, {:file, path}), do: File.read(path)
@@ -220,7 +240,7 @@ defmodule Japanese.Games.Processor do
   end
 
   defp fail(%Shot{} = shot, reason) do
-    Logger.warning("Game shot #{shot.id} failed: #{inspect(reason)}")
+    Logger.warning("Game screenshot failed: #{shot.id}: #{inspect(reason)}")
 
     # Keep whatever the record has now (e.g. the game name found while
     # processing), not the copy taken when the job was queued.

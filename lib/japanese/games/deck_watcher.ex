@@ -23,6 +23,11 @@ defmodule Japanese.Games.DeckWatcher do
   When the Deck sleeps, SSH's keepalives end the session within ~30s and the
   watcher goes back to polling.
 
+  Logging: `Steam Deck connected: <name> (<address>)` once the watch is up,
+  and `Steam Deck disconnected: <name> after <duration>` when the session
+  ends. A session that fails before it is up is a single warning per Deck
+  (with ssh's own output), not one per retry.
+
   Config (`config :japanese, Japanese.Games.DeckWatcher`): `:enabled`
   (default true; off in tests), `:poll_interval`, `:initial_backfill`.
   """
@@ -111,7 +116,7 @@ defmodule Japanese.Games.DeckWatcher do
     # So terminate/2 runs on shutdown and closes the SSH session cleanly.
     Process.flag(:trap_exit, true)
     send(self(), :poll)
-    {:ok, %{deck: nil, port: nil, existing: [], reported: nil}}
+    {:ok, initial_state()}
   end
 
   @impl GenServer
@@ -142,19 +147,23 @@ defmodule Japanese.Games.DeckWatcher do
     {:noreply, state}
   end
 
-  def handle_info({port, {:exit_status, code}}, %{port: port, deck: deck} = state) do
-    Logger.info("Deck watcher: session with #{deck.name} ended (exit #{code})")
+  def handle_info({port, {:exit_status, code}}, %{port: port} = state) do
+    failed = log_session_end(state, code)
     Games.broadcast({:deck_status, :searching})
 
     {:noreply,
-     %{state | port: nil, deck: nil, existing: [], reported: nil}
+     %{initial_state() | failed: failed}
      |> schedule_poll(config(:poll_interval, 15_000))}
   end
 
   def handle_info(_message, state), do: {:noreply, state}
 
   @impl GenServer
-  def terminate(_reason, %{port: port}) when is_port(port) do
+  def terminate(_reason, %{port: port} = state) when is_port(port) do
+    if state.connected_at do
+      Logger.info("Steam Deck disconnected: #{state.deck.name} (shutting down)")
+    end
+
     # Closing stdin makes the remote script kill inotifywait and exit.
     Port.close(port)
   catch
@@ -165,8 +174,64 @@ defmodule Japanese.Games.DeckWatcher do
 
   # --- internals ---
 
+  defp initial_state do
+    %{
+      deck: nil,
+      port: nil,
+      existing: [],
+      reported: nil,
+      # System.monotonic_time(:second) when READY arrived; nil until then.
+      connected_at: nil,
+      # Output before READY (ssh errors, mostly), newest first, for the
+      # warning if the session never gets that far.
+      early_output: [],
+      # Name of the Deck whose failed connection was already logged, so a
+      # Deck that keeps failing every poll is one warning, not hundreds.
+      failed: nil
+    }
+  end
+
+  @doc false
+  # Logs the end of an SSH session and returns the new `failed` marker.
+  def log_session_end(%{deck: deck, connected_at: connected_at}, code)
+      when is_integer(connected_at) do
+    duration = System.monotonic_time(:second) - connected_at
+
+    Logger.info(
+      "Steam Deck disconnected: #{deck.name} after #{format_duration(duration)} (exit #{code})"
+    )
+
+    nil
+  end
+
+  def log_session_end(%{deck: deck, failed: failed} = state, code) do
+    if failed == deck.name do
+      Logger.debug("Deck watcher: #{deck.name} still not reachable (exit #{code})")
+    else
+      output =
+        case state.early_output |> Enum.take(5) |> Enum.reverse() do
+          [] -> ""
+          lines -> ": " <> Enum.join(lines, " / ")
+        end
+
+      Logger.warning(
+        "Deck watcher: could not connect to #{deck.name} (#{deck.address}), " <>
+          "exit #{code}#{output}; will keep retrying"
+      )
+    end
+
+    deck.name
+  end
+
+  @doc false
+  def format_duration(seconds) when seconds < 60, do: "#{seconds}s"
+  def format_duration(seconds) when seconds < 3600, do: "#{div(seconds, 60)}m"
+
+  def format_duration(seconds),
+    do: "#{div(seconds, 3600)}h #{seconds |> rem(3600) |> div(60)}m"
+
   defp connect(state, deck) do
-    Logger.info("Deck watcher: connecting to #{deck.name} (#{deck.address})")
+    Logger.debug("Deck watcher: connecting to #{deck.name} (#{deck.address})")
 
     port =
       Port.open({:spawn_executable, Deck.ssh()}, [
@@ -177,7 +242,7 @@ defmodule Japanese.Games.DeckWatcher do
         args: Deck.ssh_args(deck, remote_script())
       ])
 
-    %{state | deck: deck, port: port, existing: [], reported: nil}
+    %{state | deck: deck, port: port, existing: [], reported: nil, early_output: []}
   end
 
   defp handle_line("NEW " <> path, state) do
@@ -191,14 +256,20 @@ defmodule Japanese.Games.DeckWatcher do
   defp handle_line("EXISTING " <> path, state), do: %{state | existing: [path | state.existing]}
 
   defp handle_line("READY", %{deck: deck} = state) do
-    Logger.info("Deck watcher: watching #{deck.name} for screenshots")
+    Logger.info("Steam Deck connected: #{deck.name} (#{deck.address})")
     Games.broadcast({:deck_status, {:connected, deck.name}})
 
     state.existing
     |> catch_up(Games.list_shots(), deck.name, config(:initial_backfill, 3))
     |> Enum.each(&Processor.enqueue_deck(deck, &1))
 
-    %{state | existing: []}
+    %{
+      state
+      | existing: [],
+        early_output: [],
+        failed: nil,
+        connected_at: System.monotonic_time(:second)
+    }
   end
 
   defp handle_line("NODIR", state) do
@@ -213,6 +284,11 @@ defmodule Japanese.Games.DeckWatcher do
 
     state
   end
+
+  # Before READY, anything else is almost always ssh complaining; keep it for
+  # the failure warning rather than logging it on every retry.
+  defp handle_line(other, %{connected_at: nil} = state),
+    do: %{state | early_output: [other | state.early_output]}
 
   defp handle_line(other, state) do
     Logger.info("Deck watcher (#{state.deck.name}): #{other}")

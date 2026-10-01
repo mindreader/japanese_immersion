@@ -87,4 +87,69 @@ defmodule Japanese.Games.DeckTest do
                paths(~w(20261001090000_2 20261001100000_1))
     end
   end
+
+  describe "connection logging" do
+    import ExUnit.CaptureLog
+
+    @deck %Deck{name: "steamdeckprime", address: "100.1.1.2"}
+
+    # The test config logs warnings and up only; let this module's info
+    # lines through so they can be captured.
+    setup do
+      Logger.put_module_level(DeckWatcher, :debug)
+      on_exit(fn -> Logger.delete_module_level(DeckWatcher) end)
+    end
+
+    test "a session that was up logs the disconnect with how long it lasted" do
+      state = %{deck: @deck, connected_at: System.monotonic_time(:second) - 125, failed: nil}
+
+      log = capture_log(fn -> assert DeckWatcher.log_session_end(state, 255) == nil end)
+      assert log =~ "Steam Deck disconnected: steamdeckprime after 2m (exit 255)"
+    end
+
+    test "a session that never came up warns once per Deck, with ssh's output" do
+      state = %{
+        deck: @deck,
+        connected_at: nil,
+        failed: nil,
+        early_output: ["second", "Permission denied (publickey)."]
+      }
+
+      log =
+        capture_log(fn -> assert DeckWatcher.log_session_end(state, 255) == "steamdeckprime" end)
+
+      assert log =~ "could not connect to steamdeckprime (100.1.1.2), exit 255"
+      assert log =~ "Permission denied (publickey). / second"
+
+      quiet =
+        capture_log([level: :info], fn ->
+          DeckWatcher.log_session_end(%{state | failed: "steamdeckprime"}, 255)
+        end)
+
+      refute quiet =~ "could not connect"
+    end
+
+    test "durations" do
+      assert DeckWatcher.format_duration(42) == "42s"
+      assert DeckWatcher.format_duration(600) == "10m"
+      assert DeckWatcher.format_duration(3 * 3600 + 5 * 60) == "3h 5m"
+    end
+  end
+
+  test "processed message names the game, time, size and description" do
+    shot = %Shot{
+      Shot.new("steamdeckprime", "1718570", "20261001083845_1.jpg", game: "ASTLIBRA")
+      | description: "equipment menu",
+        sections: [%{"lines" => [%{}, %{}]}, %{"labels" => ["EQUIP"]}, %{"lines" => [%{}]}]
+    }
+
+    assert Processor.processed_message(shot, 9_812) ==
+             ~s{Game screenshot processed: ASTLIBRA (2026-10-01 08:38:45) in 9.8s, 3 lines: "equipment menu"}
+
+    assert Processor.processed_message(
+             %Shot{shot | game: nil, sections: [%{"lines" => [%{}]}]},
+             50
+           ) =~
+             "app 1718570 (2026-10-01 08:38:45) in 0.1s, 1 line:"
+  end
 end

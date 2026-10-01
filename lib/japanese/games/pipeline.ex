@@ -40,7 +40,7 @@ defmodule Japanese.Games.Pipeline do
     with {:ok, reply} <-
            Translation.transcribe_screenshot(image, media_type, Vision.format_lines(ocr.lines)),
          {:ok, transcript} <- Transcript.parse(reply, ocr.text) do
-      Logger.info(
+      Logger.debug(
         "Game shot #{shot.id} transcribed in #{System.monotonic_time(:millisecond) - started}ms: " <>
           inspect(transcript.description)
       )
