@@ -90,6 +90,18 @@ defmodule Test.Japanese.Translation do
     end
   end
 
+  describe "Anthropic client" do
+    test "asks for Connection: close so no connection is kept idle in the pool" do
+      Mimic.expect(Anthropix, :chat, fn %Anthropix{req: req}, _opts ->
+        assert Req.Request.get_header(req, "connection") == ["close"]
+        assert req.options.finch == Japanese.Finch
+        {:ok, @anthropix_response_en}
+      end)
+
+      assert %Translation{} = Translation.ja_to_en("テスト", [])
+    end
+  end
+
   describe "ja_to_en/2" do
     test "returns a Translation struct on success" do
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @anthropix_response_en} end)

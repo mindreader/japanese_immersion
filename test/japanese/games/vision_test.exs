@@ -1,5 +1,9 @@
 defmodule Japanese.Games.VisionTest do
-  use ExUnit.Case, async: true
+  # Not async: one test sets the Vision API key in the application env.
+  use ExUnit.Case, async: false
+  use Mimic
+
+  setup :verify_on_exit!
 
   alias Japanese.Games.Vision
 
@@ -69,5 +73,19 @@ defmodule Japanese.Games.VisionTest do
 
     assert {:error, {:vision, "bad image"}} =
              Vision.parse(%{"responses" => [%{"error" => %{"message" => "bad image"}}]})
+  end
+
+  test "asks for Connection: close so no connection is kept idle in the pool" do
+    previous = Application.get_env(:japanese, Vision)
+    Application.put_env(:japanese, Vision, api_key: "test-key")
+    on_exit(fn -> Application.put_env(:japanese, Vision, previous || []) end)
+
+    Mimic.expect(Req, :post, fn _url, opts ->
+      assert opts[:headers] == [{"connection", "close"}]
+      assert opts[:finch] == Japanese.Finch
+      {:ok, %Req.Response{status: 200, body: %{"responses" => [%{}]}}}
+    end)
+
+    assert {:ok, %{lines: []}} = Vision.annotate("jpeg bytes")
   end
 end

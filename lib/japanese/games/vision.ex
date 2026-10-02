@@ -75,6 +75,8 @@ defmodule Japanese.Games.Vision do
            params: [key: key],
            json: body,
            finch: Japanese.Finch,
+           # One connection per call, never pooled: see Japanese.HTTP.
+           headers: Japanese.HTTP.no_keepalive_headers(),
            receive_timeout: 60_000,
            retry: :transient,
            max_retries: 2

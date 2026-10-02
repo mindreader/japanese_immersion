@@ -367,7 +367,15 @@ defmodule Japanese.Translation do
     # Req client falls through to the shared Req.Finch pool, whose
     # conn_max_idle_time is :infinity and which Req gives no way to configure —
     # letting stale keep-alive connections cause phantom request timeouts.
-    Anthropix.init(api_key, receive_timeout: receive_timeout, finch: Japanese.Finch)
+    #
+    # Connection: close keeps Anthropic connections out of the pool
+    # altogether: closing a dead idle one inside the pool stalls it for 5s
+    # (see Japanese.HTTP).
+    Anthropix.init(api_key,
+      receive_timeout: receive_timeout,
+      finch: Japanese.Finch,
+      headers: Japanese.HTTP.no_keepalive_headers()
+    )
   end
 
   defp call_anthropix(system_prompt, user_text, operation, opts \\ []) do
