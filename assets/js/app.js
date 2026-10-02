@@ -154,7 +154,15 @@ Hooks.AudioPlayer = {
 
 let csrfToken = document.querySelector("meta[name='csrf-token']").getAttribute("content")
 let liveSocket = new LiveSocket("/live", Socket, {
-  longPollFallbackMs: 2500,
+  // No longPollFallbackMs: the app is only reached directly over Tailscale,
+  // never through a proxy that blocks websockets. With the fallback on, a
+  // phone waking from sleep (Tailscale tunnel still coming back) missed the
+  // 2.5s window and switched to long-polling for the rest of the page's life.
+  //
+  // Reconnect quickly and keep trying every second, instead of Phoenix's
+  // default backoff that reaches 5s between attempts after ~4s of failures,
+  // so the page is back within about a second of the network returning.
+  reconnectAfterMs: tries => [100, 250, 500][tries - 1] || 1000,
   params: {_csrf_token: csrfToken},
   hooks: Hooks
 })
