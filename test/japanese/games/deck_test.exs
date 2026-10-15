@@ -36,6 +36,33 @@ defmodule Japanese.Games.DeckTest do
     assert {:error, :no_deck} = Deck.pick(%{}, "steamdeck")
   end
 
+  # What `tailscale status --json` reports when tailscale is stopped, logged
+  # out or has no peers. "Peer": null used to crash the watcher (BadMapError)
+  # and, through supervisor restarts, the whole application.
+  test "tolerates a null or malformed peer list" do
+    assert {:error, :no_deck} =
+             Deck.pick(%{"BackendState" => "Stopped", "Peer" => nil}, "steamdeck")
+
+    assert {:error, :no_deck} = Deck.pick(%{"Peer" => ["not", "a", "map"]}, "steamdeck")
+    assert {:error, :no_deck} = Deck.pick(nil, "steamdeck")
+
+    status = %{
+      "Peer" => %{
+        "junk" => nil,
+        "no_name" => %{"Online" => true, "TailscaleIPs" => ["100.1.1.9"]},
+        "bad_ips" => %{"DNSName" => "steamdeckx.ts.net.", "Online" => true, "TailscaleIPs" => nil},
+        "ok" => %{
+          "DNSName" => nil,
+          "HostName" => "SteamDeck",
+          "Online" => true,
+          "TailscaleIPs" => [nil, "100.1.1.2"]
+        }
+      }
+    }
+
+    assert {:ok, %Deck{name: "steamdeck", address: "100.1.1.2"}} = Deck.pick(status, "steamdeck")
+  end
+
   test "ssh args force the tailnet address and end with the command" do
     args = Deck.ssh_args(%Deck{name: "steamdeckprime", address: "100.1.1.2"}, "echo hi")
     assert "HostName=100.1.1.2" in args

@@ -46,7 +46,7 @@ defmodule Japanese.Games.Deck do
       tailscale ->
         case System.cmd(tailscale, ["status", "--json"], stderr_to_stdout: false) do
           {json, 0} ->
-            with {:ok, status} <- Jason.decode(json), do: pick(status, name_prefix())
+            with {:ok, status} <- Jason.decode(json), do: pick_running(status, name_prefix())
 
           {_, code} ->
             {:error, {:tailscale_exit, code}}
@@ -54,14 +54,31 @@ defmodule Japanese.Games.Deck do
     end
   end
 
+  # `tailscale status --json` exits 0 even when tailscale is stopped, logged
+  # out or offline; it just reports a BackendState other than "Running" (and
+  # "Peer": null). Say so, rather than reporting "no Deck online".
+  defp pick_running(%{"BackendState" => backend}, _prefix)
+       when is_binary(backend) and backend != "Running",
+       do: {:error, {:tailscale_not_running, backend}}
+
+  defp pick_running(status, prefix), do: pick(status, prefix)
+
   @doc """
   Picks an online Deck from a decoded `tailscale status --json` document.
+
+  Tolerates anything that isn't the expected shape (notably `"Peer": null`,
+  which tailscale reports when it has no peers) as "no Deck".
   """
-  @spec pick(map(), String.t()) :: {:ok, t()} | {:error, :no_deck}
+  @spec pick(term(), String.t()) :: {:ok, t()} | {:error, :no_deck}
   def pick(status, prefix) do
-    status
-    |> Map.get("Peer", %{})
-    |> Map.values()
+    peers =
+      case status do
+        %{"Peer" => peers} when is_map(peers) -> Map.values(peers)
+        _ -> []
+      end
+
+    peers
+    |> Enum.filter(&is_map/1)
     |> Enum.filter(&(&1["Online"] == true))
     |> Enum.map(fn peer -> {peer_name(peer), ipv4(peer["TailscaleIPs"])} end)
     |> Enum.filter(fn {name, address} ->
@@ -163,15 +180,16 @@ defmodule Japanese.Games.Deck do
   def shell_quote(string), do: "'" <> String.replace(string, "'", "'\\''") <> "'"
 
   defp peer_name(peer) do
-    case peer["DNSName"] do
-      dns when is_binary(dns) and dns != "" -> dns |> String.split(".") |> hd()
-      _ -> peer["HostName"] || ""
+    case peer do
+      %{"DNSName" => dns} when is_binary(dns) and dns != "" -> dns |> String.split(".") |> hd()
+      %{"HostName" => host} when is_binary(host) -> host
+      _ -> ""
     end
     |> String.downcase()
   end
 
   defp ipv4(ips) do
-    ips |> List.wrap() |> Enum.find(&String.contains?(&1, "."))
+    ips |> List.wrap() |> Enum.find(&(is_binary(&1) and String.contains?(&1, ".")))
   end
 
   @doc false

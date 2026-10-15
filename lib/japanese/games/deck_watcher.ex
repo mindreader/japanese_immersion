@@ -34,9 +34,13 @@ defmodule Japanese.Games.DeckWatcher do
   ends. A session that fails before it is up is a single warning per Deck
   (with ssh's own output), not one per retry.
 
+  Failure to look for a Deck (tailscale stopped, logged out, offline, or
+  anything unexpected) is never fatal: it is logged once and retried every
+  `poll_interval`.
+
   Config (`config :japanese, Japanese.Games.DeckWatcher`): `:enabled`
-  (default true; off in tests), `:poll_interval`, `:initial_backfill`,
-  `:max_age_days`.
+  (default true; off in tests), `:poll_interval`, `:startup_delay` (default
+  5s before the first poll), `:initial_backfill`, `:max_age_days`.
   """
 
   use GenServer
@@ -156,8 +160,14 @@ defmodule Japanese.Games.DeckWatcher do
       problem -> Logger.warning("Deck watcher: SSH key problem: #{problem}")
     end
 
-    send(self(), :poll)
-    {:ok, initial_state()}
+    # The first poll is delayed rather than immediate. If something on the
+    # poll path ever crashes this process, the supervisor restarts it, and an
+    # immediate poll would crash it again within milliseconds. A few of those
+    # in a row exceed the supervisor's restart intensity (3 in 5s by default)
+    # and take the whole application down. With the delay, a crash-looping
+    # watcher restarts at most once per startup_delay and the rest of the app
+    # carries on.
+    {:ok, schedule_poll(initial_state(), config(:startup_delay, 5_000))}
   end
 
   @impl GenServer
@@ -169,12 +179,9 @@ defmodule Japanese.Games.DeckWatcher do
 
   @impl GenServer
   def handle_info(:poll, %{port: nil} = state) do
-    case Deck.find() do
-      {:ok, deck} ->
-        {:noreply, connect(state, deck)}
-
-      {:error, reason} ->
-        {:noreply, state |> report(reason) |> schedule_poll()}
+    case find_and_connect(state) do
+      {:connected, state} -> {:noreply, state}
+      {:error, reason} -> {:noreply, state |> report(reason) |> schedule_poll()}
     end
   end
 
@@ -270,6 +277,22 @@ defmodule Japanese.Games.DeckWatcher do
 
   def format_duration(seconds),
     do: "#{div(seconds, 3600)}h #{seconds |> rem(3600) |> div(60)}m"
+
+  # Looking for a Deck shells out to tailscale, parses its JSON and spawns
+  # ssh; any of that can fail in ways nobody anticipated (tailscale down or
+  # logged out, odd JSON, ssh missing). Whatever happens, it is one failed
+  # poll: report it and try again next interval, never crash the watcher.
+  defp find_and_connect(state) do
+    case Deck.find() do
+      {:ok, deck} -> {:connected, connect(state, deck)}
+      {:error, reason} -> {:error, reason}
+    end
+  rescue
+    exception ->
+      {:error, {:exception, Exception.format_banner(:error, exception, __STACKTRACE__)}}
+  catch
+    kind, reason -> {:error, {kind, reason}}
+  end
 
   defp connect(state, deck) do
     Logger.debug("Deck watcher: connecting to #{deck.name} (#{deck.address})")
