@@ -362,18 +362,19 @@ defmodule Japanese.Translation do
 
     receive_timeout = Keyword.get(config, :receive_timeout, @default_receive_timeout)
 
-    # finch: Japanese.Finch routes through our own pool, which sets
-    # conn_max_idle_time (see Japanese.Application). Without this, Anthropix's
-    # Req client falls through to the shared Req.Finch pool, whose
-    # conn_max_idle_time is :infinity and which Req gives no way to configure —
-    # letting stale keep-alive connections cause phantom request timeouts.
+    # finch: [name: Japanese.Finch] routes through our own pool, which sets
+    # conn_max_idle_time (see Japanese.Application). Without it, Anthropix's
+    # Req client falls through to Req's shared default pool, whose
+    # conn_max_idle_time is :infinity — letting stale keep-alive connections
+    # cause phantom request timeouts. (Req 0.7 deprecated the bare
+    # `finch: name` form; it still works but warns on every request.)
     #
     # Connection: close keeps Anthropic connections out of the pool
     # altogether: closing a dead idle one inside the pool stalls it for 5s
     # (see Japanese.HTTP).
     Anthropix.init(api_key,
       receive_timeout: receive_timeout,
-      finch: Japanese.Finch,
+      finch: [name: Japanese.Finch],
       headers: Japanese.HTTP.no_keepalive_headers()
     )
   end

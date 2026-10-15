@@ -82,7 +82,7 @@ defmodule Japanese.Games.VisionTest do
 
     Mimic.expect(Req, :post, fn _url, opts ->
       assert opts[:headers] == [{"connection", "close"}]
-      assert opts[:finch] == Japanese.Finch
+      assert opts[:finch] == [name: Japanese.Finch]
       {:ok, %Req.Response{status: 200, body: %{"responses" => [%{}]}}}
     end)
 

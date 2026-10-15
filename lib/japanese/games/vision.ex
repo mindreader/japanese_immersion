@@ -74,7 +74,7 @@ defmodule Japanese.Games.Vision do
     case Req.post(@endpoint,
            params: [key: key],
            json: body,
-           finch: Japanese.Finch,
+           finch: [name: Japanese.Finch],
            # One connection per call, never pooled: see Japanese.HTTP.
            headers: Japanese.HTTP.no_keepalive_headers(),
            receive_timeout: 60_000,
