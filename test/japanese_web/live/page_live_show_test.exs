@@ -21,6 +21,23 @@ defmodule JapaneseWeb.PageLive.ShowTest do
     assert html =~ "Hello!"
   end
 
+  test "has the Recent lookups button and its client-side dialog", %{conn: conn} do
+    story = %Story{name: "test_story"}
+    page = %Page{number: 1, story: story.name}
+    translation = %{translation: [%{japanese: "こんにちは", english: "Hello!"}]}
+    Mimic.stub(Story, :get_by_name, fn "test_story" -> {:ok, story} end)
+    Mimic.stub(Story, :get_page, fn ^story, 1 -> {:ok, page} end)
+    Mimic.stub(Page, :get_translation, fn ^page -> {:ok, translation} end)
+    {:ok, view, _html} = live(conn, ~p"/stories/#{story.name}/#{page.number}")
+
+    assert has_element?(view, "#recent-words-open", "Recent")
+    # Filled in by the RecentWords JS hook; LiveView must leave it alone.
+    assert has_element?(view, "#recent-words-modal[phx-hook=RecentWords][phx-update=ignore]")
+    # Outside the story's TextSelection hook, so selecting a word in the
+    # dialog isn't treated as a selection in the story.
+    refute has_element?(view, "#story-container #recent-words-modal")
+  end
+
   test "updates when translation is finished", %{conn: conn} do
     story = %Story{name: "test_story"}
     page = %Page{number: 1, story: story.name}

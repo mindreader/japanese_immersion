@@ -25,6 +25,119 @@ import topbar from "../vendor/topbar"
 // Hook to preserve scroll position in sessionStorage
 let Hooks = {};
 
+// Recently looked-up words (see JapaneseWeb.RecentWords). Kept in
+// localStorage so the list survives disconnects, back buttons and restarts.
+// Stored newest first; a repeat lookup moves the word back to the front.
+const RecentWords = {
+  key: "recent-jpdb-lookups",
+  max: 30,
+
+  load() {
+    try {
+      const words = JSON.parse(localStorage.getItem(this.key) || "[]");
+      return Array.isArray(words) ? words.filter((w) => typeof w === "string") : [];
+    } catch (_e) {
+      return [];
+    }
+  },
+
+  record(word) {
+    word = (word || "").trim();
+    if (!word) return;
+    const words = [word, ...this.load().filter((w) => w !== word)].slice(0, this.max);
+    try {
+      localStorage.setItem(this.key, JSON.stringify(words));
+    } catch (_e) {
+      // Storage full or disabled (private mode): the lookup still works.
+    }
+  }
+};
+
+const openJpdb = (text) => {
+  RecentWords.record(text);
+  window.open(
+    `https://jpdb.io/search?q=${encodeURIComponent(text)}`,
+    '_blank',
+    'noopener,noreferrer'
+  );
+};
+
+Hooks.RecentWords = {
+  mounted() {
+    this.list = this.el.querySelector('[data-role="list"]');
+    this.empty = this.el.querySelector('[data-role="empty"]');
+    this.jpdb = this.el.querySelector('[data-role="jpdb"]');
+    this.selected = "";
+
+    this.isOpen = () => !this.el.classList.contains("hidden");
+
+    this.setSelected = (text) => {
+      this.selected = text;
+      this.jpdb.disabled = !text;
+    };
+
+    // Shown oldest to newest, opened scrolled to the bottom: the newest
+    // words sit right above the Okay/JPDB buttons. The list is built when
+    // the dialog opens and left alone while it is open: a re-lookup is
+    // saved (so the word is at the bottom next time) but the rows don't
+    // reshuffle under your finger.
+    this.open = () => {
+      const words = RecentWords.load().reverse();
+      this.list.replaceChildren(...words.map((word) => {
+        const li = document.createElement("li");
+        li.className = "py-2";
+        li.textContent = word;
+        return li;
+      }));
+      this.empty.classList.toggle("hidden", words.length > 0);
+      this.setSelected("");
+      this.el.classList.remove("hidden");
+      this.list.scrollTop = this.list.scrollHeight;
+    };
+
+    this.close = () => {
+      this.el.classList.add("hidden");
+      this.setSelected("");
+    };
+
+    // Only a selection inside the list counts. An empty selection is
+    // ignored rather than clearing: on mobile, tapping JPDB can collapse the
+    // selection before the click lands.
+    this.onSelectionChange = () => {
+      if (!this.isOpen()) return;
+      const sel = window.getSelection();
+      const text = sel ? sel.toString().trim() : "";
+      if (text && sel.rangeCount > 0 &&
+          this.list.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        this.setSelected(text);
+      }
+    };
+
+    this.onClick = (e) => {
+      const role = e.target.dataset && e.target.dataset.role;
+      if (role === "close" || role === "backdrop") {
+        this.close();
+      } else if (e.target.closest('[data-role="jpdb"]') && this.selected) {
+        openJpdb(this.selected);
+      }
+    };
+
+    this.onKeydown = (e) => {
+      if (e.key === "Escape" && this.isOpen()) this.close();
+    };
+
+    this.el.addEventListener("recent-words:open", this.open);
+    this.el.addEventListener("click", this.onClick);
+    document.addEventListener("selectionchange", this.onSelectionChange);
+    window.addEventListener("keydown", this.onKeydown);
+  },
+
+  destroyed() {
+    document.removeEventListener("selectionchange", this.onSelectionChange);
+    window.removeEventListener("keydown", this.onKeydown);
+  }
+};
+
 Hooks.TextSelection = {
   mounted() {
     this.selectedText = "";
@@ -69,11 +182,7 @@ Hooks.TextSelection = {
       if (!text) return;
 
       if (jpdb) {
-        window.open(
-          `https://jpdb.io/search?q=${encodeURIComponent(text)}`,
-          '_blank',
-          'noopener,noreferrer'
-        );
+        openJpdb(text);
       } else {
         this.pushEvent("start_explain", { text });
       }

@@ -1,11 +1,16 @@
 <.header>
   Page {@page.number} of story {@story.name}
   <:actions>
-    <.link href={~p"/stories/#{@story.name}/#{@page.number}/japanese"}>
-      <.button>View Original Japanese</.button>
-    </.link>
+    <div class="flex items-center gap-2">
+      <JapaneseWeb.RecentWords.open_button />
+      <.link href={~p"/stories/#{@story.name}/#{@page.number}/japanese"}>
+        <.button>View Original Japanese</.button>
+      </.link>
+    </div>
   </:actions>
 </.header>
+
+<JapaneseWeb.RecentWords.dialog />
 
 <div id="story-container" phx-hook="TextSelection" class="relative flex flex-col h-[60vh] mt-8">
   <div

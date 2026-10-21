@@ -1,5 +1,6 @@
 <div class="flex items-center justify-between gap-4 text-sm">
   <.link navigate={~p"/stories"} class="text-zinc-500 hover:text-zinc-800">&larr; Stories</.link>
+  <JapaneseWeb.RecentWords.open_button class="ml-auto" />
   <span
     id="deck-status"
     class={[
@@ -252,3 +253,5 @@
     </div>
   </div>
 </.modal>
+
+<JapaneseWeb.RecentWords.dialog />

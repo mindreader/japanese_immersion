@@ -55,6 +55,9 @@ defmodule JapaneseWeb.GameLiveTest do
     assert has_element?(view, ".game-text .tr-ja", "銅の槍")
     assert has_element?(view, "#toggle-english")
     refute has_element?(view, "#toggle-japanese")
+    assert has_element?(view, "#recent-words-open", "Recent")
+    assert has_element?(view, "#recent-words-modal[phx-hook=RecentWords][phx-update=ignore]")
+    refute has_element?(view, ".game-text #recent-words-modal")
     refute has_element?(view, "#newer-shot")
 
     view |> element("#older-shot") |> render_click()

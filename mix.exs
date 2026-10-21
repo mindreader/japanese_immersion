@@ -8,6 +8,9 @@ defmodule Japanese.MixProject do
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      # Lets Phoenix.CodeReloader see compiles done outside it (Elixir 1.18+);
+      # without it, dev warns on every reload.
+      listeners: [Phoenix.CodeReloader],
       aliases: aliases(),
       deps: deps()
     ]
