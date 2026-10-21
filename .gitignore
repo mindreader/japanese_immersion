@@ -40,3 +40,7 @@ npm-debug.log
 .env
 
 txt/
+
+# nix build output symlinks
+/result
+/result-*
