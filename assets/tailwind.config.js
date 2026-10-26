@@ -11,6 +11,9 @@ module.exports = {
     "../lib/japanese_web.ex",
     "../lib/japanese_web/**/*.*ex"
   ],
+  // Dark mode follows a `dark` class on <html>, set by the inline script in
+  // root.html.heex from the saved choice or the browser's preference.
+  darkMode: "selector",
   theme: {
     extend: {
       colors: {

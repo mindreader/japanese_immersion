@@ -7,11 +7,56 @@
     <.live_title default="Japanese" suffix=" · Phoenix Framework">
       {assigns[:page_title]}
     </.live_title>
+    <%!-- Theme: "light", "dark", or nothing saved meaning follow the browser.
+         Inline and before the stylesheet so the page never flashes the wrong
+         colours. It lives on <html>, outside every LiveView, so patches and
+         live navigation never undo it. The switch on the stories page sends a
+         "theme:set" event (see JapaneseWeb.CoreComponents.theme_toggle/1). --%>
+    <script>
+      (() => {
+        const key = "theme";
+        const media = window.matchMedia("(prefers-color-scheme: dark)");
+        const valid = (theme) => (theme === "light" || theme === "dark" ? theme : "system");
+        // Used when localStorage is unavailable (private mode): the choice
+        // then only lasts for this page.
+        let fallback = "system";
+        const load = () => {
+          try {
+            return valid(localStorage.getItem(key));
+          } catch (_e) {
+            return fallback;
+          }
+        };
+        const apply = () => {
+          const pref = load();
+          const dark = pref === "dark" || (pref === "system" && media.matches);
+          const root = document.documentElement;
+          root.classList.toggle("dark", dark);
+          root.style.colorScheme = dark ? "dark" : "light";
+          root.dataset.themePref = pref;
+        };
+        apply();
+        media.addEventListener("change", apply);
+        window.addEventListener("storage", (e) => e.key === key && apply());
+        window.addEventListener("theme:set", (e) => {
+          const theme = valid(e.detail && e.detail.theme);
+          fallback = theme;
+          try {
+            if (theme === "system") {
+              localStorage.removeItem(key);
+            } else {
+              localStorage.setItem(key, theme);
+            }
+          } catch (_e) {}
+          apply();
+        });
+      })();
+    </script>
     <link phx-track-static rel="stylesheet" href={~p"/assets/app.css"} />
     <script defer phx-track-static type="text/javascript" src={~p"/assets/app.js"}>
     </script>
   </head>
-  <body class="bg-white">
+  <body class="bg-white dark:bg-zinc-950 dark:text-zinc-100">
     {@inner_content}
   </body>
 </html>

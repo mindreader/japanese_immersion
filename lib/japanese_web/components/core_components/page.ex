@@ -30,26 +30,29 @@ defmodule JapaneseWeb.CoreComponents.Page do
             <% :paragraph_break -> %>
               <div style="height: 1.5em;"></div>
             <% {:separator, glyph} -> %>
-              <div class="tr-sep text-center text-gray-500 font-serif text-lg my-4 select-none">
+              <div class="tr-sep text-center text-gray-500 dark:text-zinc-400 font-serif text-lg my-4 select-none">
                 {glyph}
               </div>
             <% {:pair, japanese, english} -> %>
               <div :if={japanese} class="tr-ja font-serif text-lg">
                 {japanese}
               </div>
-              <div :if={is_nil(japanese)} class="tr-ja font-serif text-lg italic text-gray-400">
+              <div
+                :if={is_nil(japanese)}
+                class="tr-ja font-serif text-lg italic text-gray-400 dark:text-zinc-500"
+              >
                 (original line missing)
               </div>
               <div
                 :if={english}
-                class="tr-eng text-blue-900 bg-blue-50 rounded p-2 border border-blue-200 mb-4"
+                class="tr-eng text-blue-900 dark:text-blue-100 bg-blue-50 dark:bg-blue-950 rounded p-2 border border-blue-200 dark:border-blue-800 mb-4"
                 style="visibility: hidden;"
               >
                 {english}
               </div>
               <div
                 :if={is_nil(english)}
-                class="tr-eng text-amber-800 bg-amber-50 rounded p-2 border border-dashed border-amber-300 mb-4 italic"
+                class="tr-eng text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950 rounded p-2 border border-dashed border-amber-300 dark:border-amber-700 mb-4 italic"
                 style="visibility: hidden;"
               >
                 not translated

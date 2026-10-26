@@ -30,8 +30,8 @@ defmodule JapaneseWeb.RecentWords do
       id="recent-words-open"
       phx-click={JS.dispatch("recent-words:open", to: "#recent-words-modal")}
       class={[
-        "rounded-lg bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-800",
-        "hover:bg-zinc-200 active:text-zinc-900/80",
+        "rounded-lg bg-zinc-100 dark:bg-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-800 dark:text-zinc-200",
+        "hover:bg-zinc-200 dark:hover:bg-zinc-700 active:text-zinc-900/80",
         @class
       ]}
     >
@@ -52,24 +52,24 @@ defmodule JapaneseWeb.RecentWords do
       aria-modal="true"
       aria-labelledby="recent-words-title"
     >
-      <div class="fixed inset-0 bg-zinc-50/90" data-role="backdrop"></div>
+      <div class="fixed inset-0 bg-zinc-50/90 dark:bg-zinc-950/90" data-role="backdrop"></div>
       <div class="fixed inset-0 flex items-center justify-center p-4" data-role="backdrop">
-        <div class="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl bg-white p-6 shadow-lg ring-1 ring-zinc-700/10">
-          <h3 id="recent-words-title" class="text-lg font-semibold text-zinc-900">
+        <div class="flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-lg ring-1 ring-zinc-700/10 dark:ring-zinc-700">
+          <h3 id="recent-words-title" class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
             Recent lookups
           </h3>
-          <p class="mt-1 text-xs text-zinc-500">
+          <p class="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
             Newest at the bottom. Select a word and press JPDB to look it up again.
           </p>
-          <p data-role="empty" class="mt-6 hidden text-sm text-zinc-500">
+          <p data-role="empty" class="mt-6 hidden text-sm text-zinc-500 dark:text-zinc-400">
             No lookups yet on this device.
           </p>
           <ol
             data-role="list"
-            class="mt-4 flex-1 divide-y divide-zinc-100 overflow-y-auto font-serif text-xl"
+            class="mt-4 flex-1 divide-y divide-zinc-100 dark:divide-zinc-800 overflow-y-auto font-serif text-xl"
           >
           </ol>
-          <div class="mt-4 flex justify-end gap-3 border-t border-zinc-200 pt-4">
+          <div class="mt-4 flex justify-end gap-3 border-t border-zinc-200 dark:border-zinc-700 pt-4">
             <button
               type="button"
               data-role="jpdb"
@@ -81,7 +81,7 @@ defmodule JapaneseWeb.RecentWords do
             <button
               type="button"
               data-role="close"
-              class="rounded-lg bg-zinc-900 px-6 py-2 text-white shadow hover:bg-zinc-700"
+              class="rounded-lg bg-zinc-900 dark:bg-zinc-700 px-6 py-2 text-white shadow hover:bg-zinc-700 dark:hover:bg-zinc-600"
             >
               Okay
             </button>

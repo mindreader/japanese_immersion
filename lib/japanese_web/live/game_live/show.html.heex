@@ -1,12 +1,17 @@
 <div class="flex items-center justify-between gap-4 text-sm">
-  <.link navigate={~p"/stories"} class="text-zinc-500 hover:text-zinc-800">&larr; Stories</.link>
+  <.link
+    navigate={~p"/"}
+    class="text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200"
+  >&larr; Home</.link>
   <JapaneseWeb.RecentWords.open_button class="ml-auto" />
   <span
     id="deck-status"
     class={[
       "rounded-full px-3 py-1",
-      match?({:connected, _}, @deck_status) && "bg-green-100 text-green-800",
-      !match?({:connected, _}, @deck_status) && "bg-zinc-100 text-zinc-600"
+      match?({:connected, _}, @deck_status) &&
+        "bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200",
+      !match?({:connected, _}, @deck_status) &&
+        "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
     ]}
   >
     {deck_label(@deck_status)}
@@ -16,7 +21,7 @@
 <div
   :if={@arrived}
   id="arrived-banner"
-  class="mt-4 flex items-center gap-3 rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+  class="mt-4 flex items-center gap-3 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950 px-4 py-2 text-sm text-amber-900 dark:text-amber-100"
 >
   <span class="flex-1">
     New screenshot: {@arrived.description || status_label(@arrived.status) || @arrived.file}
@@ -25,7 +30,7 @@
   <button
     phx-click="dismiss_arrived"
     type="button"
-    class="text-amber-700 hover:text-amber-900"
+    class="text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200"
     aria-label="Dismiss"
   >
     &times;
@@ -35,10 +40,10 @@
 <%= if @shot do %>
   <% {older, newer} = neighbours(@shots, @shot) %>
   <div class="mt-6">
-    <div class="text-sm text-zinc-500">
+    <div class="text-sm text-zinc-500 dark:text-zinc-400">
       {@shot.game || "App #{@shot.appid}"} · {@shot.taken_at || @shot.file}
     </div>
-    <h1 id="shot-description" class="text-xl font-semibold text-zinc-900">
+    <h1 id="shot-description" class="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
       {@shot.description || status_label(@shot.status) || @shot.file}
     </h1>
   </div>
@@ -48,35 +53,38 @@
       :if={older}
       id="older-shot"
       patch={~p"/game/#{older.id}"}
-      class="rounded border px-3 py-1 hover:bg-zinc-50"
+      class="rounded border px-3 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800"
     >
       &larr; Older
     </.link>
-    <span :if={!older} class="rounded border px-3 py-1 text-zinc-300">&larr; Older</span>
+    <span :if={!older} class="rounded border px-3 py-1 text-zinc-300 dark:text-zinc-600">&larr; Older</span>
     <.link
       :if={newer}
       id="newer-shot"
       patch={~p"/game/#{newer.id}"}
-      class="rounded border px-3 py-1 hover:bg-zinc-50"
+      class="rounded border px-3 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800"
     >
       Newer &rarr;
     </.link>
-    <span :if={!newer} class="rounded border px-3 py-1 text-zinc-300">Newer &rarr;</span>
+    <span :if={!newer} class="rounded border px-3 py-1 text-zinc-300 dark:text-zinc-600">Newer &rarr;</span>
 
     <details id="shot-list" class="relative ml-auto">
-      <summary class="cursor-pointer rounded border px-3 py-1 hover:bg-zinc-50">
+      <summary class="cursor-pointer rounded border px-3 py-1 hover:bg-zinc-50 dark:hover:bg-zinc-800">
         All shots ({length(@shots)})
       </summary>
-      <ul class="absolute right-0 z-40 mt-1 max-h-96 w-80 overflow-y-auto rounded border bg-white shadow-lg">
-        <li :for={s <- @shots} class={[s.id == @shot.id && "bg-blue-50"]}>
-          <.link patch={~p"/game/#{s.id}"} class="block px-3 py-2 hover:bg-zinc-50">
-            <div class="text-xs text-zinc-500">
+      <ul class="absolute right-0 z-40 mt-1 max-h-96 w-80 overflow-y-auto rounded border bg-white dark:bg-zinc-900 shadow-lg">
+        <li :for={s <- @shots} class={[s.id == @shot.id && "bg-blue-50 dark:bg-blue-950"]}>
+          <.link
+            patch={~p"/game/#{s.id}"}
+            class="block px-3 py-2 hover:bg-zinc-50 dark:hover:bg-zinc-800"
+          >
+            <div class="text-xs text-zinc-500 dark:text-zinc-400">
               {s.taken_at} · {s.game || "App #{s.appid}"}
-              <span :if={status_label(s.status)} class="text-amber-700">
+              <span :if={status_label(s.status)} class="text-amber-700 dark:text-amber-400">
                 · {status_label(s.status)}
               </span>
             </div>
-            <div class="text-sm text-zinc-900">{s.description || s.file}</div>
+            <div class="text-sm text-zinc-900 dark:text-zinc-100">{s.description || s.file}</div>
           </.link>
         </li>
       </ul>
@@ -86,11 +94,11 @@
   <div
     id={"game-text-#{@shot.id}"}
     phx-hook="TextSelection"
-    class="game-text relative mt-4 rounded border bg-white p-4 shadow"
+    class="game-text relative mt-4 rounded border bg-white dark:bg-zinc-900 p-4 shadow"
   >
     <%= case @shot.status do %>
       <% status when status in [:pending, :processing] -> %>
-        <div class="flex items-center justify-center py-8 text-zinc-600">
+        <div class="flex items-center justify-center py-8 text-zinc-600 dark:text-zinc-400">
           <svg class="animate-spin h-6 w-6 mr-3" viewBox="0 0 24 24">
             <circle
               class="opacity-25"
@@ -111,7 +119,7 @@
         </div>
       <% :error -> %>
         <div class="flex flex-col items-center justify-center py-8">
-          <div class="text-red-600 mb-4">Failed: {@shot.error}</div>
+          <div class="text-red-600 dark:text-red-400 mb-4">Failed: {@shot.error}</div>
           <button
             phx-click="retry_shot"
             class="rounded bg-blue-600 text-white px-4 py-2 hover:bg-blue-700"
@@ -121,15 +129,18 @@
           </button>
         </div>
       <% :done -> %>
-        <div :if={@shot.sections == []} class="py-8 text-center text-zinc-500">
+        <div :if={@shot.sections == []} class="py-8 text-center text-zinc-500 dark:text-zinc-400">
           No text found in this screenshot.
         </div>
-        <div :if={@shot.pointer} class="g-eng mb-4 text-sm text-zinc-500">
+        <div :if={@shot.pointer} class="g-eng mb-4 text-sm text-zinc-500 dark:text-zinc-400">
           Pointer: {@shot.pointer}
         </div>
         <section :for={section <- @shot.sections} class="mb-6 last:mb-0">
-          <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400">
-            {section["name"]}<span :if={section["speaker"]} class="normal-case text-zinc-600"> · {section[
+          <h2 class="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            {section["name"]}<span
+              :if={section["speaker"]}
+              class="normal-case text-zinc-600 dark:text-zinc-400"
+            > · {section[
               "speaker"
             ]}</span>
           </h2>
@@ -139,8 +150,9 @@
               class={[
                 "rounded px-2 py-0.5 text-xs",
                 label == section["focused_label"] &&
-                  "bg-amber-100 text-amber-900 ring-1 ring-amber-400",
-                label != section["focused_label"] && "bg-zinc-100 text-zinc-600"
+                  "bg-amber-100 dark:bg-amber-900 text-amber-900 dark:text-amber-100 ring-1 ring-amber-400",
+                label != section["focused_label"] &&
+                  "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
               ]}
             >
               {label}
@@ -150,23 +162,23 @@
             :for={line <- section["lines"]}
             class={[
               "mb-3 border-l-4 pl-3",
-              line["focused"] && "border-amber-400 bg-amber-50",
+              line["focused"] && "border-amber-400 bg-amber-50 dark:bg-amber-950",
               !line["focused"] && "border-transparent"
             ]}
           >
             <div class="tr-ja font-serif text-lg">{line["ja"]}</div>
-            <div :if={line["reading"]} class="g-kana text-sm text-purple-800">
+            <div :if={line["reading"]} class="g-kana text-sm text-purple-800 dark:text-purple-300">
               {line["reading"]}
             </div>
             <div
               :if={line["en"]}
-              class="g-eng mt-1 rounded border border-blue-200 bg-blue-50 p-2 text-blue-900"
+              class="g-eng mt-1 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950 p-2 text-blue-900 dark:text-blue-100"
             >
               {line["en"]}
             </div>
             <div
               :if={line["unverified"] || line["ocr_note"] || line["ocr_missed"]}
-              class="mt-1 text-xs italic text-zinc-400"
+              class="mt-1 text-xs italic text-zinc-400 dark:text-zinc-500"
             >
               {cond do
                 line["ocr_note"] -> "Note: #{line["ocr_note"]}"
@@ -182,7 +194,7 @@
       <button
         id="toggle-english"
         phx-click={JS.toggle_class("show-eng", to: ".game-text")}
-        class="rounded-full bg-zinc-900 text-white px-6 py-3 shadow-lg hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+        class="rounded-full bg-zinc-900 dark:bg-zinc-700 text-white px-6 py-3 shadow-lg hover:bg-zinc-700 dark:hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
         type="button"
       >
         Toggle English
@@ -223,7 +235,7 @@
   </div>
   <div class="h-40"></div>
 <% else %>
-  <div id="no-shots" class="mt-16 text-center text-zinc-500">
+  <div id="no-shots" class="mt-16 text-center text-zinc-500 dark:text-zinc-400">
     <p>No screenshots yet.</p>
     <p class="mt-2 text-sm">
       Take one on the Deck with Steam + R1 and it will show up here.
@@ -238,14 +250,14 @@
   on_cancel={JS.push("close_explanation_modal")}
 >
   <div class="space-y-4">
-    <h3 class="text-lg font-semibold text-zinc-900">Explanation</h3>
-    <div class="markdown-content text-zinc-700 leading-relaxed space-y-3">
+    <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Explanation</h3>
+    <div class="markdown-content text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-3">
       {Phoenix.HTML.raw(@explanation)}
     </div>
-    <div class="flex justify-end pt-4 border-t border-zinc-200">
+    <div class="flex justify-end pt-4 border-t border-zinc-200 dark:border-zinc-700">
       <button
         phx-click="close_explanation_modal"
-        class="rounded-lg bg-zinc-900 text-white px-6 py-2 shadow hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
+        class="rounded-lg bg-zinc-900 dark:bg-zinc-700 text-white px-6 py-2 shadow hover:bg-zinc-700 dark:hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
         type="button"
       >
         Okay

@@ -17,7 +17,7 @@ defmodule JapaneseWeb.Router do
   scope "/", JapaneseWeb do
     pipe_through :browser
 
-    get "/", RootController, :home
+    live "/", HomeLive, :index
 
     live "/stories", StoryLive.Index, :index
     live "/stories/new", StoryLive.Index, :new

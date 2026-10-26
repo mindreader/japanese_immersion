@@ -50,7 +50,11 @@ defmodule JapaneseWeb.CoreComponents do
       data-cancel={JS.exec(@on_cancel, "phx-remove")}
       class="relative z-50 hidden"
     >
-      <div id={"#{@id}-bg"} class="bg-zinc-50/90 fixed inset-0 transition-opacity" aria-hidden="true" />
+      <div
+        id={"#{@id}-bg"}
+        class="bg-zinc-50/90 dark:bg-zinc-950/90 fixed inset-0 transition-opacity"
+        aria-hidden="true"
+      />
       <div
         class="fixed inset-0 overflow-y-auto"
         aria-labelledby={"#{@id}-title"}
@@ -66,7 +70,7 @@ defmodule JapaneseWeb.CoreComponents do
               phx-window-keydown={JS.exec("data-cancel", to: "##{@id}")}
               phx-key="escape"
               phx-click-away={JS.exec("data-cancel", to: "##{@id}")}
-              class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-white p-14 shadow-lg ring-1 transition"
+              class="shadow-zinc-700/10 ring-zinc-700/10 relative hidden rounded-2xl bg-white p-14 shadow-lg ring-1 transition dark:bg-zinc-900 dark:ring-zinc-700 dark:shadow-black/40"
             >
               <div class="absolute top-6 right-5">
                 <button
@@ -116,8 +120,10 @@ defmodule JapaneseWeb.CoreComponents do
       role="alert"
       class={[
         "fixed top-2 right-2 mr-2 w-80 sm:w-96 z-50 rounded-lg p-3 ring-1",
-        @kind == :info && "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900",
-        @kind == :error && "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900"
+        @kind == :info &&
+          "bg-emerald-50 text-emerald-800 ring-emerald-500 fill-cyan-900 dark:bg-emerald-950 dark:text-emerald-200",
+        @kind == :error &&
+          "bg-rose-50 text-rose-900 shadow-md ring-rose-500 fill-rose-900 dark:bg-rose-950 dark:text-rose-200"
       ]}
       {@rest}
     >
@@ -202,7 +208,7 @@ defmodule JapaneseWeb.CoreComponents do
   def simple_form(assigns) do
     ~H"""
     <.form :let={f} for={@for} as={@as} {@rest}>
-      <div class="mt-10 space-y-8 bg-white">
+      <div class="mt-10 space-y-8">
         {render_slot(@inner_block, f)}
         <div :for={action <- @actions} class="mt-2 flex items-center justify-between gap-6">
           {render_slot(action, f)}
@@ -232,6 +238,7 @@ defmodule JapaneseWeb.CoreComponents do
       type={@type}
       class={[
         "phx-submit-loading:opacity-75 rounded-lg bg-zinc-900 hover:bg-zinc-700 py-2 px-3",
+        "dark:bg-zinc-700 dark:hover:bg-zinc-600",
         "text-sm font-semibold leading-6 text-white active:text-white/80",
         @class
       ]}
@@ -310,7 +317,7 @@ defmodule JapaneseWeb.CoreComponents do
 
     ~H"""
     <div>
-      <label class="flex items-center gap-4 text-sm leading-6 text-zinc-600">
+      <label class="flex items-center gap-4 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
         <input type="hidden" name={@name} value="false" disabled={@rest[:disabled]} />
         <input
           type="checkbox"
@@ -318,7 +325,7 @@ defmodule JapaneseWeb.CoreComponents do
           name={@name}
           value="true"
           checked={@checked}
-          class="rounded border-zinc-300 text-zinc-900 focus:ring-0"
+          class="rounded border-zinc-300 text-zinc-900 focus:ring-0 dark:border-zinc-600 dark:bg-zinc-800"
           {@rest}
         />
         {@label}
@@ -335,7 +342,7 @@ defmodule JapaneseWeb.CoreComponents do
       <select
         id={@id}
         name={@name}
-        class="mt-2 block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0 sm:text-sm"
+        class="mt-2 block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0 sm:text-sm dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
         multiple={@multiple}
         {@rest}
       >
@@ -355,8 +362,9 @@ defmodule JapaneseWeb.CoreComponents do
         id={@id}
         name={@name}
         class={[
-          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 min-h-[6rem]",
-          @errors == [] && "border-zinc-300 focus:border-zinc-400",
+          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 dark:bg-zinc-800 dark:text-zinc-100 min-h-[6rem]",
+          @errors == [] &&
+            "border-zinc-300 focus:border-zinc-400 dark:border-zinc-600 dark:focus:border-zinc-500",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         {@rest}
@@ -377,8 +385,9 @@ defmodule JapaneseWeb.CoreComponents do
         id={@id}
         value={Phoenix.HTML.Form.normalize_value(@type, @value)}
         class={[
-          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6",
-          @errors == [] && "border-zinc-300 focus:border-zinc-400",
+          "mt-2 block w-full rounded-lg text-zinc-900 focus:ring-0 sm:text-sm sm:leading-6 dark:bg-zinc-800 dark:text-zinc-100",
+          @errors == [] &&
+            "border-zinc-300 focus:border-zinc-400 dark:border-zinc-600 dark:focus:border-zinc-500",
           @errors != [] && "border-rose-400 focus:border-rose-400"
         ]}
         {@rest}
@@ -396,7 +405,7 @@ defmodule JapaneseWeb.CoreComponents do
 
   def label(assigns) do
     ~H"""
-    <label for={@for} class="block text-sm font-semibold leading-6 text-zinc-800">
+    <label for={@for} class="block text-sm font-semibold leading-6 text-zinc-800 dark:text-zinc-200">
       {render_slot(@inner_block)}
     </label>
     """
@@ -409,7 +418,7 @@ defmodule JapaneseWeb.CoreComponents do
 
   def error(assigns) do
     ~H"""
-    <p class="mt-3 flex gap-3 text-sm leading-6 text-rose-600">
+    <p class="mt-3 flex gap-3 text-sm leading-6 text-rose-600 dark:text-rose-400">
       <.icon name="hero-exclamation-circle-mini" class="mt-0.5 h-5 w-5 flex-none" />
       {render_slot(@inner_block)}
     </p>
@@ -429,10 +438,10 @@ defmodule JapaneseWeb.CoreComponents do
     ~H"""
     <header class={[@actions != [] && "flex items-center justify-between gap-6", @class]}>
       <div>
-        <h1 class="text-lg font-semibold leading-8 text-zinc-800">
+        <h1 class="text-lg font-semibold leading-8 text-zinc-800 dark:text-zinc-100">
           {render_slot(@inner_block)}
         </h1>
-        <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600">
+        <p :if={@subtitle != []} class="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
           {render_slot(@subtitle)}
         </p>
       </div>
@@ -475,7 +484,7 @@ defmodule JapaneseWeb.CoreComponents do
     ~H"""
     <div class="overflow-y-auto px-4 sm:overflow-visible sm:px-0">
       <table class="w-[40rem] mt-11 sm:w-full">
-        <thead class="text-sm text-left leading-6 text-zinc-500">
+        <thead class="text-sm text-left leading-6 text-zinc-500 dark:text-zinc-400">
           <tr>
             <th :for={col <- @col} class="p-0 pb-4 pr-6 font-normal">{col[:label]}</th>
             <th :if={@action != []} class="relative p-0 pb-4">
@@ -486,27 +495,31 @@ defmodule JapaneseWeb.CoreComponents do
         <tbody
           id={@id}
           phx-update={match?(%Phoenix.LiveView.LiveStream{}, @rows) && "stream"}
-          class="relative divide-y divide-zinc-100 border-t border-zinc-200 text-sm leading-6 text-zinc-700"
+          class="relative divide-y divide-zinc-100 border-t border-zinc-200 text-sm leading-6 text-zinc-700 dark:divide-zinc-800 dark:border-zinc-700 dark:text-zinc-300"
         >
-          <tr :for={row <- @rows} id={@row_id && @row_id.(row)} class="group hover:bg-zinc-50">
+          <tr
+            :for={row <- @rows}
+            id={@row_id && @row_id.(row)}
+            class="group hover:bg-zinc-50 dark:hover:bg-zinc-900"
+          >
             <td
               :for={{col, i} <- Enum.with_index(@col)}
               phx-click={@row_click && @row_click.(row)}
               class={["relative p-0", @row_click && "hover:cursor-pointer"]}
             >
               <div class="block py-4 pr-6">
-                <span class="absolute -inset-y-px right-0 -left-4 group-hover:bg-zinc-50 sm:rounded-l-xl" />
-                <span class={["relative", i == 0 && "font-semibold text-zinc-900"]}>
+                <span class="absolute -inset-y-px right-0 -left-4 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-900 sm:rounded-l-xl" />
+                <span class={["relative", i == 0 && "font-semibold text-zinc-900 dark:text-zinc-100"]}>
                   {render_slot(col, @row_item.(row))}
                 </span>
               </div>
             </td>
             <td :if={@action != []} class="relative w-14 p-0">
               <div class="relative whitespace-nowrap py-4 text-right text-sm font-medium">
-                <span class="absolute -inset-y-px -right-4 left-0 group-hover:bg-zinc-50 sm:rounded-r-xl" />
+                <span class="absolute -inset-y-px -right-4 left-0 group-hover:bg-zinc-50 dark:group-hover:bg-zinc-900 sm:rounded-r-xl" />
                 <span
                   :for={action <- @action}
-                  class="relative ml-4 font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
+                  class="relative ml-4 font-semibold leading-6 text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300"
                 >
                   {render_slot(action, @row_item.(row))}
                 </span>
@@ -536,12 +549,53 @@ defmodule JapaneseWeb.CoreComponents do
   def list(assigns) do
     ~H"""
     <div class="mt-14">
-      <dl class="-my-4 divide-y divide-zinc-100">
+      <dl class="-my-4 divide-y divide-zinc-100 dark:divide-zinc-800">
         <div :for={item <- @item} class="flex gap-4 py-4 text-sm leading-6 sm:gap-8">
-          <dt class="w-1/4 flex-none text-zinc-500">{item.title}</dt>
-          <dd class="text-zinc-700">{render_slot(item)}</dd>
+          <dt class="w-1/4 flex-none text-zinc-500 dark:text-zinc-400">{item.title}</dt>
+          <dd class="text-zinc-700 dark:text-zinc-300">{render_slot(item)}</dd>
         </div>
       </dl>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders the light / dark / system theme switch.
+
+  Purely client-side: each button dispatches a `theme:set` event that the
+  script in `root.html.heex` handles (saving to `localStorage`, or clearing
+  it for "system" so the browser's preference is followed again). The
+  highlighted option comes from CSS on `html[data-theme-pref]`, so the server
+  never needs to know the choice.
+  """
+  attr :id, :string, default: "theme-toggle"
+
+  def theme_toggle(assigns) do
+    ~H"""
+    <div
+      id={@id}
+      role="group"
+      aria-label={gettext("Colour theme")}
+      class="inline-flex rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800"
+    >
+      <button
+        :for={
+          {theme, icon, label} <- [
+            {"light", "hero-sun-mini", gettext("Light")},
+            {"dark", "hero-moon-mini", gettext("Dark")},
+            {"system", "hero-computer-desktop-mini", gettext("System")}
+          ]
+        }
+        type="button"
+        phx-click={JS.dispatch("theme:set", to: "html", detail: %{theme: theme})}
+        class={[
+          "theme-opt-#{theme} flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium",
+          "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+        ]}
+      >
+        <.icon name={icon} class="h-4 w-4" />
+        {label}
+      </button>
     </div>
     """
   end
@@ -561,7 +615,7 @@ defmodule JapaneseWeb.CoreComponents do
     <div class="mt-16">
       <.link
         navigate={@navigate}
-        class="text-sm font-semibold leading-6 text-zinc-900 hover:text-zinc-700"
+        class="text-sm font-semibold leading-6 text-zinc-900 hover:text-zinc-700 dark:text-zinc-100 dark:hover:text-zinc-300"
       >
         <.icon name="hero-arrow-left-solid" class="h-3 w-3" />
         {render_slot(@inner_block)}
@@ -633,7 +687,7 @@ defmodule JapaneseWeb.CoreComponents do
       <button
         type="button"
         phx-click={show("##{@id}-menu")}
-        class="p-1 text-zinc-500 hover:text-zinc-700 focus:outline-none"
+        class="p-1 text-zinc-500 hover:text-zinc-700 focus:outline-none dark:text-zinc-400 dark:hover:text-zinc-200"
         aria-label="Actions"
       >
         <.icon name="hero-cog-6-tooth" class="h-5 w-5" />
@@ -642,7 +696,7 @@ defmodule JapaneseWeb.CoreComponents do
       <div
         id={"#{@id}-menu"}
         phx-click-away={hide("##{@id}-menu")}
-        class="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg ring-1 ring-zinc-900/10 hidden z-50"
+        class="absolute right-0 mt-1 w-48 rounded-lg bg-white shadow-lg ring-1 ring-zinc-900/10 hidden z-50 dark:bg-zinc-800 dark:ring-zinc-700"
       >
         <div class="py-1" role="menu">
           <.link
@@ -650,7 +704,7 @@ defmodule JapaneseWeb.CoreComponents do
             :if={item[:navigate] && !item[:disabled]}
             navigate={item[:navigate]}
             class={[
-              "block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50",
+              "block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-700",
               item[:class]
             ]}
             role="menuitem"
@@ -663,7 +717,7 @@ defmodule JapaneseWeb.CoreComponents do
             :if={item[:patch] && !item[:disabled]}
             patch={item[:patch]}
             class={[
-              "block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50",
+              "block px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-700",
               item[:class]
             ]}
             role="menuitem"
@@ -676,7 +730,7 @@ defmodule JapaneseWeb.CoreComponents do
             :if={!item[:navigate] && !item[:patch] && !item[:disabled]}
             type="button"
             class={[
-              "block w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50",
+              "block w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-zinc-700",
               item[:class]
             ]}
             role="menuitem"
@@ -688,7 +742,7 @@ defmodule JapaneseWeb.CoreComponents do
           <div
             :for={item <- @item}
             :if={item[:disabled]}
-            class="block px-4 py-2 text-sm text-zinc-400 cursor-not-allowed"
+            class="block px-4 py-2 text-sm text-zinc-400 cursor-not-allowed dark:text-zinc-500"
             role="menuitem"
           >
             {render_slot(item)}

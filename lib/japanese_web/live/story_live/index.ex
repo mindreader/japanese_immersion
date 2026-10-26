@@ -36,7 +36,7 @@ defmodule JapaneseWeb.StoryLive.Index do
 
   defp apply_action(socket, :index, _params) do
     socket
-    |> assign(:page_title, "Listing Stories")
+    |> assign(:page_title, "Stories")
     |> assign(:story, nil)
   end
 

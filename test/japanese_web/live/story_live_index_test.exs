@@ -16,7 +16,7 @@ defmodule JapaneseWeb.StoryLive.IndexTest do
 
     Mimic.stub(Corpus, :list_stories, fn -> stories end)
     {:ok, _view, html} = live(conn, ~p"/stories")
-    assert html =~ "Listing Stories"
+    assert html =~ "Stories"
     assert html =~ "story1"
     assert html =~ "story2"
   end
