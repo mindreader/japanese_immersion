@@ -49,7 +49,8 @@ defmodule JapaneseWeb.PageLive.ShowTest do
 
     assert has_element?(
              view,
-             "#story-shortcuts[phx-hook=StoryShortcuts][data-root='#story-container']"
+             "#story-shortcuts[phx-hook=StoryShortcuts][data-root='#story-container']" <>
+               "[data-scroll='#story-scroll-container']"
            )
 
     assert has_element?(view, "button[aria-keyshortcuts=E]", "Toggle English")
@@ -57,7 +58,7 @@ defmodule JapaneseWeb.PageLive.ShowTest do
     # JPDB only appears once Japanese text is selected.
     refute has_element?(view, "#jpdb-button")
     render_hook(view, "text_selected", %{"text" => "こんにちは"})
-    assert has_element?(view, "#jpdb-button[aria-keyshortcuts=J]", "JPDB")
+    assert has_element?(view, "#jpdb-button[aria-keyshortcuts=D]", "JPDB")
   end
 
   test "updates when translation is finished", %{conn: conn} do

@@ -155,22 +155,52 @@ const japaneseSelection = (root) => {
 
 // Keyboard shortcuts on the story page view (PageLive.Show), so reading on
 // a desktop doesn't need the mouse for every button. Keys are listed in
-// `shortcuts`; the hook element's data-root is the story container that
-// selections must be in. Ignored while typing, during IME composition, with
-// Ctrl/Alt/Cmd held, on key repeat, and while a dialog is open.
+// `shortcuts`. The hook element's data-root is the story container that
+// selections must be in, data-scroll the element j/k scroll. Ignored while
+// typing, during IME composition, with Ctrl/Alt/Cmd held, and while a
+// dialog is open; held-down keys only repeat where marked.
 Hooks.StoryShortcuts = {
   mounted() {
     const root = () => document.querySelector(this.el.dataset.root);
+    const scroller = () => document.querySelector(this.el.dataset.scroll);
 
+    // vi-style j/k: a quarter of the visible text per press, about one
+    // Japanese + English pair, a bit more than a mouse-wheel notch.
+    // Smooth, but presses arriving while a scroll is still animating add to
+    // where it was heading rather than to where it has got to (otherwise
+    // each new smooth scroll restarts from the same spot and quick taps or
+    // a held key barely move). A held key scrolls instantly.
+    let target = null;
+    let targetAt = 0;
+    const scroll = (direction) => (e) => {
+      const el = scroller();
+      if (!el) return false;
+
+      const animating = target !== null && performance.now() - targetAt < 400;
+      const from = animating ? target : el.scrollTop;
+      const max = el.scrollHeight - el.clientHeight;
+      target = Math.min(max, Math.max(0, from + direction * Math.max(60, el.clientHeight / 4)));
+      targetAt = performance.now();
+      el.scrollTo({ top: target, behavior: e.repeat ? "auto" : "smooth" });
+    };
+
+    // key -> { run(event), repeat }. run returning false means "not
+    // handled" (the key goes to the browser as usual). repeat: also fire
+    // while the key is held down.
     const shortcuts = {
       // Toggle English
-      e: () => window.toggleVisibilityByClass("tr-eng"),
-      // Look up the highlighted Japanese on JPDB
-      j: () => {
-        const text = japaneseSelection(root());
-        if (!text) return false;
-        openJpdb(text);
-      }
+      e: { run: () => window.toggleVisibilityByClass("tr-eng") },
+      // Look up the highlighted Japanese on JPDB ("dictionary")
+      d: {
+        run: () => {
+          const text = japaneseSelection(root());
+          if (!text) return false;
+          openJpdb(text);
+        }
+      },
+      // Scroll the text down / up
+      j: { run: scroll(1), repeat: true },
+      k: { run: scroll(-1), repeat: true }
     };
 
     const dialogOpen = () =>
@@ -182,12 +212,12 @@ Hooks.StoryShortcuts = {
       (target.closest("input, textarea, select, [contenteditable]:not([contenteditable=false])"));
 
     this.onKeydown = (e) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
       if (typing(e.target) || dialogOpen()) return;
 
-      const action = shortcuts[e.key.toLowerCase()];
-      if (!action) return;
-      if (action() !== false) e.preventDefault();
+      const shortcut = shortcuts[e.key.toLowerCase()];
+      if (!shortcut || (e.repeat && !shortcut.repeat)) return;
+      if (shortcut.run(e) !== false) e.preventDefault();
     };
 
     window.addEventListener("keydown", this.onKeydown);
