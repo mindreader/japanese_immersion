@@ -14,7 +14,7 @@ defmodule JapaneseWeb.HomeLive do
   def render(assigns) do
     ~H"""
     <.header>
-      Japanese
+      Japanese Immersion
       <:subtitle>Pick something to practise.</:subtitle>
     </.header>
 

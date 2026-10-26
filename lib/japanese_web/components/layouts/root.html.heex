@@ -4,7 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content={get_csrf_token()} />
-    <.live_title default="Japanese" suffix=" · Phoenix Framework">
+    <%!-- LiveView adds the suffix to the default as well, so every page
+         sets a page_title (the home page uses "Home"). --%>
+    <.live_title default="Home" suffix=" · Japanese Immersion">
       {assigns[:page_title]}
     </.live_title>
     <%!-- Theme: "light", "dark", or nothing saved meaning follow the browser.

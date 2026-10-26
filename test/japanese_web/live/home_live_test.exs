@@ -5,6 +5,8 @@ defmodule JapaneseWeb.HomeLiveTest do
   test "links to each mode and shows the theme switch", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/")
 
+    assert page_title(view) == "Home · Japanese Immersion"
+
     assert has_element?(view, ~s|#mode-stories[href="/stories"]|)
     assert has_element?(view, ~s|#mode-game[href="/game"]|)
     assert has_element?(view, ~s|#mode-drill[href="/drill"]|)
