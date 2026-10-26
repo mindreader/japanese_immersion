@@ -601,6 +601,26 @@ defmodule JapaneseWeb.CoreComponents do
   end
 
   @doc """
+  Renders a small keyboard-shortcut badge for a button label, e.g.
+  `Toggle English <.shortcut_key key="E" />`.
+
+  Hidden below the `md` breakpoint, where there is usually no keyboard.
+  `aria-hidden` because the button carries `aria-keyshortcuts` instead.
+  """
+  attr :key, :string, required: true
+
+  def shortcut_key(assigns) do
+    ~H"""
+    <kbd
+      aria-hidden="true"
+      class="ml-1.5 hidden rounded border border-white/40 px-1.5 font-sans text-xs opacity-80 md:inline-block"
+    >
+      {@key}
+    </kbd>
+    """
+  end
+
+  @doc """
   Renders a back navigation link.
 
   ## Examples

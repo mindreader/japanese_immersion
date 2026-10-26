@@ -138,29 +138,76 @@ Hooks.RecentWords = {
   }
 };
 
+// Japanese text currently selected inside `root` (within a .tr-ja line), or
+// "" if the selection is empty or elsewhere.
+const japaneseSelection = (root) => {
+  const selection = window.getSelection();
+  const text = selection ? selection.toString().trim() : "";
+  if (!text || selection.rangeCount === 0) return "";
+
+  let node = selection.getRangeAt(0).commonAncestorContainer;
+  while (node && node !== root) {
+    if (node.classList && node.classList.contains("tr-ja")) return text;
+    node = node.parentElement;
+  }
+  return "";
+};
+
+// Keyboard shortcuts on the story page view (PageLive.Show), so reading on
+// a desktop doesn't need the mouse for every button. Keys are listed in
+// `shortcuts`; the hook element's data-root is the story container that
+// selections must be in. Ignored while typing, during IME composition, with
+// Ctrl/Alt/Cmd held, on key repeat, and while a dialog is open.
+Hooks.StoryShortcuts = {
+  mounted() {
+    const root = () => document.querySelector(this.el.dataset.root);
+
+    const shortcuts = {
+      // Toggle English
+      e: () => window.toggleVisibilityByClass("tr-eng"),
+      // Look up the highlighted Japanese on JPDB
+      j: () => {
+        const text = japaneseSelection(root());
+        if (!text) return false;
+        openJpdb(text);
+      }
+    };
+
+    const dialogOpen = () =>
+      document.getElementById("explanation-modal") ||
+      document.querySelector("#recent-words-modal:not(.hidden)");
+
+    const typing = (target) =>
+      target instanceof Element &&
+      (target.closest("input, textarea, select, [contenteditable]:not([contenteditable=false])"));
+
+    this.onKeydown = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.isComposing) return;
+      if (typing(e.target) || dialogOpen()) return;
+
+      const action = shortcuts[e.key.toLowerCase()];
+      if (!action) return;
+      if (action() !== false) e.preventDefault();
+    };
+
+    window.addEventListener("keydown", this.onKeydown);
+  },
+
+  destroyed() {
+    window.removeEventListener("keydown", this.onKeydown);
+  }
+};
+
 Hooks.TextSelection = {
   mounted() {
     this.selectedText = "";
 
     this.handleSelection = () => {
-      const selection = window.getSelection();
-      const selectedText = selection.toString().trim();
-
+      const selectedText = japaneseSelection(this.el);
       if (selectedText) {
-        // Check if selection is within a tr-ja container
-        const range = selection.getRangeAt(0);
-        let container = range.commonAncestorContainer;
-
-        // Walk up the DOM tree to find if we're inside a tr-ja element
-        while (container && container !== this.el) {
-          if (container.classList && container.classList.contains('tr-ja')) {
-            // We're selecting Japanese text!
-            this.selectedText = selectedText;
-            this.pushEvent("text_selected", { text: selectedText });
-            return;
-          }
-          container = container.parentElement;
-        }
+        this.selectedText = selectedText;
+        this.pushEvent("text_selected", { text: selectedText });
+        return;
       }
 
       // If no Japanese text selected, clear selection

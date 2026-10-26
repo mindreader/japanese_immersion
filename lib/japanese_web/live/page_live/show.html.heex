@@ -12,6 +12,10 @@
 
 <JapaneseWeb.RecentWords.dialog />
 
+<%!-- Keyboard shortcuts (E: toggle English, J: JPDB lookup of the
+     highlighted Japanese). See Hooks.StoryShortcuts in app.js. --%>
+<div id="story-shortcuts" phx-hook="StoryShortcuts" data-root="#story-container" hidden></div>
+
 <div id="story-container" phx-hook="TextSelection" class="relative flex flex-col h-[60vh] mt-8">
   <div
     id="story-scroll-container"
@@ -63,8 +67,10 @@
       onclick="toggleVisibilityByClass('tr-eng')"
       class="rounded-full bg-zinc-900 dark:bg-zinc-700 text-white px-6 py-3 shadow-lg hover:bg-zinc-700 dark:hover:bg-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
       type="button"
+      title="Toggle English (E)"
+      aria-keyshortcuts="E"
     >
-      Toggle English
+      Toggle English <.shortcut_key key="E" />
     </button>
     <!-- JPDB button - middle on mobile, center on desktop, hidden for long text -->
     <button
@@ -72,8 +78,10 @@
       id="jpdb-button"
       type="button"
       class="rounded-full bg-blue-600 text-white px-6 py-3 shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 transition text-center"
+      title="Look up on JPDB (J)"
+      aria-keyshortcuts="J"
     >
-      JPDB
+      JPDB <.shortcut_key key="J" />
     </button>
     <!-- Explain button - top on mobile, leftmost on desktop -->
     <button

@@ -38,6 +38,28 @@ defmodule JapaneseWeb.PageLive.ShowTest do
     refute has_element?(view, "#story-container #recent-words-modal")
   end
 
+  test "mounts the keyboard shortcuts and labels the buttons", %{conn: conn} do
+    story = %Story{name: "test_story"}
+    page = %Page{number: 1, story: story.name}
+    translation = %{translation: [%{japanese: "こんにちは", english: "Hello!"}]}
+    Mimic.stub(Story, :get_by_name, fn "test_story" -> {:ok, story} end)
+    Mimic.stub(Story, :get_page, fn ^story, 1 -> {:ok, page} end)
+    Mimic.stub(Page, :get_translation, fn ^page -> {:ok, translation} end)
+    {:ok, view, _html} = live(conn, ~p"/stories/#{story.name}/#{page.number}")
+
+    assert has_element?(
+             view,
+             "#story-shortcuts[phx-hook=StoryShortcuts][data-root='#story-container']"
+           )
+
+    assert has_element?(view, "button[aria-keyshortcuts=E]", "Toggle English")
+
+    # JPDB only appears once Japanese text is selected.
+    refute has_element?(view, "#jpdb-button")
+    render_hook(view, "text_selected", %{"text" => "こんにちは"})
+    assert has_element?(view, "#jpdb-button[aria-keyshortcuts=J]", "JPDB")
+  end
+
   test "updates when translation is finished", %{conn: conn} do
     story = %Story{name: "test_story"}
     page = %Page{number: 1, story: story.name}
