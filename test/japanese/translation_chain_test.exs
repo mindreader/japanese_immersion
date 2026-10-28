@@ -12,6 +12,14 @@ defmodule Test.Japanese.Translation.Chain do
   end
 
   describe "chain/1" do
+    test "the default leaves Google out" do
+      Application.put_env(:japanese, Translation, api_key: "dummy-key")
+
+      for operation <- [:ja_to_en, :en_to_ja, :explain, :screenshot] do
+        refute Enum.any?(Translation.chain(operation), &String.contains?(&1, "google"))
+      end
+    end
+
     test "defaults to Anthropic first, then OpenRouter entries" do
       Application.put_env(:japanese, Translation, api_key: "dummy-key")
 
@@ -125,6 +133,47 @@ defmodule Test.Japanese.Translation.Chain do
           Translation.parse_spec(bad)
         end
       end
+    end
+  end
+
+  describe "running the chain" do
+    test "goes down a configured chain in order until one answers" do
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        chain: "anthropic/claude-sonnet-5-5,openrouter/vendor/one,openrouter/vendor/two"
+      )
+
+      Mimic.stub(Japanese.OpenRouter, :configured?, fn -> true end)
+
+      Mimic.expect(Anthropix, :chat, fn _client, _opts ->
+        {:ok,
+         %{
+           "content" => [],
+           "id" => "msg",
+           "model" => "claude-sonnet-5-5",
+           "role" => "assistant",
+           "stop_reason" => "refusal",
+           "type" => "message",
+           "usage" => %{"input_tokens" => 1, "output_tokens" => 0}
+         }}
+      end)
+
+      Mimic.expect(Japanese.OpenRouter, :chat, 2, fn
+        "vendor/one", _s, _u, _o ->
+          {:error, {:openrouter_http, 503, "busy"}}
+
+        "vendor/two", _s, _u, _o ->
+          {:ok,
+           %{
+             text: "Second time lucky",
+             model: "vendor/two",
+             finish_reason: "stop",
+             usage: %{input_tokens: 1, output_tokens: 1}
+           }}
+      end)
+
+      assert %Translation{text: "Second time lucky", model: "openrouter/vendor/two"} =
+               Translation.ja_to_en("テスト", [])
     end
   end
 

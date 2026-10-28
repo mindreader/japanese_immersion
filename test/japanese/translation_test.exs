@@ -308,22 +308,6 @@ defmodule Test.Japanese.Translation do
       assert %Translation{text: "Rescued"} = Translation.ja_to_en("テスト", [])
     end
 
-    test "goes down the chain in order until one answers" do
-      Mimic.stub(OpenRouter, :configured?, fn -> true end)
-      [first, second | _] = openrouter_models(:ja_to_en)
-      Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @refusal} end)
-
-      Mimic.expect(OpenRouter, :chat, 2, fn
-        ^first, _s, _u, _o -> {:error, {:openrouter_http, 503, "busy"}}
-        ^second, _s, _u, _o -> completion("Second time lucky", second)
-      end)
-
-      assert %Translation{text: "Second time lucky", model: model} =
-               Translation.ja_to_en("テスト", [])
-
-      assert model == "openrouter/" <> second
-    end
-
     test "every entry failing lists each failure" do
       Mimic.stub(OpenRouter, :configured?, fn -> true end)
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @refusal} end)

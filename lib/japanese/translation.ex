@@ -16,7 +16,7 @@ defmodule Japanese.Translation do
 
       ["anthropic/claude-sonnet-5-5",            # Anthropic's API directly
        "openrouter/anthropic/claude-sonnet-5.5", # the same model via OpenRouter
-       "openrouter/google/gemini-3.8-flash"]     # another vendor entirely
+       "openrouter/deepseek/deepseek-v4.1-flash"] # another vendor entirely
 
   Providers: `anthropic` (needs `ANTHROPIC_API_KEY`) and `openrouter` (needs
   `OPENROUTER_API_KEY`, see `Japanese.OpenRouter`). An entry whose provider
@@ -63,13 +63,12 @@ defmodule Japanese.Translation do
 
   # Sonnet first: cheaper than an Opus-class model with a much larger output
   # ceiling and a 1M context, which covers whole-page interleaved translation.
-  # Then two other vendors through OpenRouter, so one provider's moderation
-  # can't block both. (Listing "openrouter/anthropic/claude-sonnet-5.5" too
-  # would cover an Anthropic API outage, but not a refusal: OpenRouter
-  # moderates its Anthropic models.)
+  # Then DeepSeek through OpenRouter, for refusals. Google's models are
+  # deliberately left out, to keep refused text away from Google. (Listing
+  # "openrouter/anthropic/claude-sonnet-5.5" would cover an Anthropic API
+  # outage, but not a refusal: OpenRouter moderates its Anthropic models.)
   @default_chain [
     "anthropic/claude-sonnet-5-5",
-    "openrouter/google/gemini-3.8-flash",
     "openrouter/deepseek/deepseek-v4.1-flash"
   ]
 
@@ -555,7 +554,7 @@ defmodule Japanese.Translation do
 
       config :japanese, Japanese.Translation,
         # shared by every operation
-        chain: ["anthropic/claude-sonnet-5-5", "openrouter/google/gemini-3.8-flash"],
+        chain: ["anthropic/claude-sonnet-5-5", "openrouter/deepseek/deepseek-v4.1-flash"],
         # per-operation override
         chains: %{explain: ["anthropic/claude-haiku-5"]}
 
@@ -564,7 +563,7 @@ defmodule Japanese.Translation do
   `_EN_TO_JA`, `_EXPLAIN` or `_SCREENSHOT` for one operation, each a
   comma-separated list:
 
-      TRANSLATION_CHAIN=anthropic/claude-opus-5,openrouter/google/gemini-3.8-flash
+      TRANSLATION_CHAIN=anthropic/claude-opus-5,openrouter/deepseek/deepseek-v4.1-flash
 
   So a string is split on commas (one entry with no commas is a one-entry
   chain), and a `nil`, blank or empty value counts as unset: the operation's

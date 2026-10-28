@@ -26,7 +26,7 @@ defmodule Japanese.OpenRouter do
 
   @doc """
   Sends one system prompt + user message to `model` (an OpenRouter model id
-  such as `"google/gemini-3.8-flash"`). The user message is a string or a
+  such as `"deepseek/deepseek-v4.1-flash"`). The user message is a string or a
   list of OpenAI-format content parts (`text` / `image_url`).
 
   Returns `{:ok, completion}` with the reply text, or an error:
