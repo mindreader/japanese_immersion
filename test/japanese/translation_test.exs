@@ -371,4 +371,158 @@ defmodule Test.Japanese.Translation do
       assert model == "openrouter/" <> first
     end
   end
+
+  describe "pages every model refuses" do
+    # Six paragraphs of ten lines (a break is two blank lines in this format);
+    # line 25 is the one the "filter" objects to.
+    @page Enum.map_join(0..5, "\n\n\n", fn p ->
+            Enum.map_join(1..10, "\n", fn i ->
+              n = p * 10 + i
+              if n == 25, do: "問題の行です。", else: "これは#{n}行目です。"
+            end)
+          end)
+
+    defp reply(text) do
+      %{
+        "content" => [%{"type" => "text", "text" => text}],
+        "id" => "msg",
+        "model" => "claude-sonnet-5-5",
+        "role" => "assistant",
+        "stop_reason" => "end_turn",
+        "type" => "message",
+        "usage" => %{"input_tokens" => 10, "output_tokens" => 10}
+      }
+    end
+
+    @refused %{
+      "content" => [],
+      "id" => "msg",
+      "model" => "claude-sonnet-5-5",
+      "role" => "assistant",
+      "stop_reason" => "refusal",
+      "type" => "message",
+      "usage" => %{"input_tokens" => 10, "output_tokens" => 0}
+    }
+
+    # Translates every numbered line of the request as "Line <n>".
+    defp translate_request(opts) do
+      [%{content: numbered}] = opts[:messages]
+
+      numbered
+      |> String.split("\n")
+      |> Enum.flat_map(fn line ->
+        case Regex.run(~r/^(\d+)\t/, line) do
+          [_, n] -> ["#{n}\tLine #{n}"]
+          nil -> []
+        end
+      end)
+      |> Enum.join("\n")
+    end
+
+    defp request_lines(opts) do
+      [%{content: numbered}] = opts[:messages]
+      for line <- String.split(numbered, "\n"), line != "", do: line
+    end
+
+    # The whole page is refused, as is any piece holding line 25. Pieces run
+    # in their own tasks, so requests are reported to the test process.
+    defp filter_line_25(test) do
+      fn _client, opts ->
+        lines = request_lines(opts)
+        send(test, {:request, length(lines)})
+
+        cond do
+          length(lines) == 60 -> {:ok, @refused}
+          Enum.any?(lines, &String.contains?(&1, "問題")) -> {:ok, @refused}
+          true -> {:ok, reply(translate_request(opts))}
+        end
+      end
+    end
+
+    test "a page that's translated whole is not split" do
+      Mimic.expect(Anthropix, :chat, fn _client, opts -> {:ok, reply(translate_request(opts))} end)
+
+      assert {:ok, text} = Translation.translate_page_text(@page)
+      assert length(String.split(text, "\n")) == 60
+    end
+
+    test "a refused page is translated in pieces, leaving only the refused piece out" do
+      Mimic.stub(Anthropix, :chat, filter_line_25(self()))
+
+      assert {:ok, text} = Translation.translate_page_text(@page, "story page 184")
+
+      numbers =
+        for line <- String.split(text, "\n"),
+            do: line |> String.split("\t") |> hd() |> String.to_integer()
+
+      # Pieces fall on paragraph breaks: 1-20, 21-40 (refused), 41-60.
+      assert numbers == Enum.to_list(1..20) ++ Enum.to_list(41..60)
+      assert "41\tLine 41" in String.split(text, "\n")
+
+      # One whole-page request, then three pieces of 20 lines.
+      assert_received {:request, 60}
+      for _ <- 1..3, do: assert_received({:request, 20})
+    end
+
+    test "the merged reply pairs with the page, refused lines saved as not translated" do
+      Mimic.stub(Anthropix, :chat, filter_line_25(self()))
+
+      {:ok, text} = Translation.translate_page_text(@page)
+
+      {:ok, %{translation: entries}} =
+        text
+        |> Translation.Json.format_to_translation_json(@page)
+        |> Translation.Json.decode_translation()
+
+      lines = Enum.filter(entries, &Map.has_key?(&1, :japanese))
+      assert length(lines) == 60
+      assert Enum.at(lines, 0) == %{japanese: "これは1行目です。", english: "Line 1"}
+      assert Enum.at(lines, 24) == %{japanese: "問題の行です。", english: nil}
+      assert Enum.at(lines, 20).english == nil
+      assert Enum.at(lines, 40) == %{japanese: "これは41行目です。", english: "Line 41"}
+      assert Enum.count(entries, &Map.has_key?(&1, :paragraph_break)) == 5
+    end
+
+    test "if every piece is refused, the page fails with the original error" do
+      Mimic.stub(Anthropix, :chat, fn _client, _opts -> {:ok, @refused} end)
+
+      assert {:error, :refused} = Translation.translate_page_text(@page)
+    end
+
+    test "a failure that isn't a refusal is not retried in pieces" do
+      Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:error, :llm_error} end)
+
+      assert {:error, :llm_error} = Translation.translate_page_text(@page)
+    end
+
+    test "a prose refusal counts as a refusal, not as a translation" do
+      Mimic.stub(Anthropix, :chat, fn _client, opts ->
+        if length(request_lines(opts)) == 60,
+          do: {:ok, reply("I'm sorry, but I can't help translate this passage.")},
+          else: {:ok, reply(translate_request(opts))}
+      end)
+
+      assert {:ok, text} = Translation.translate_page_text(@page)
+      assert length(String.split(text, "\n")) == 60
+      refute text =~ "sorry"
+    end
+
+    test "a whole-page translation that ignored the numbering is still accepted" do
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        bare = opts |> translate_request() |> String.replace(~r/^\d+\t/m, "")
+        {:ok, reply(bare)}
+      end)
+
+      assert {:ok, text} = Translation.translate_page_text(@page)
+      refute text =~ ~r/^\d+\t/m
+    end
+
+    test "refused?/1" do
+      assert Translation.refused?(:refused)
+      assert Translation.refused?({:all_models_failed, [{"a/b", :refused}, {"c/d", :refused}]})
+      refute Translation.refused?({:all_models_failed, [{"a/b", :refused}, {"c/d", :timeout}]})
+      refute Translation.refused?({:all_models_failed, []})
+      refute Translation.refused?(:timeout)
+    end
+  end
 end

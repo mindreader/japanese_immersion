@@ -28,6 +28,21 @@ defmodule Japanese.Translation do
   or another provider's content filter), an outage that outlasts the retries,
   or a timeout. See `chain/1` for configuration and the default.
 
+  ## Pages every model refuses
+
+  Content filters judge a whole request, so one passage can sink a page. When
+  every model in the chain refuses a page, it is split at paragraph breaks
+  into pieces of about 25 lines, which are translated separately (in
+  parallel, against the same time budget) and merged back by line number.
+  Lines from a piece that is refused too are saved untranslated
+  (`english: nil`) and show as "not translated" on the page. A refused piece
+  is not split any further: the aim is to keep the rest of the page, not to
+  get the refused passage past a filter.
+
+  A reply that comes back as prose instead of numbered lines (a model saying
+  it can't help, rather than refusing outright) counts as a refusal too, so
+  the chain moves on rather than saving it as a translation.
+
   The Anthropic entry uses the unpinned `claude-sonnet-5-5` alias rather than
   a dated snapshot: a dated id is perfectly reproducible but eventually gets
   deprecated and starts hard-failing, while an alias keeps working but means
@@ -59,6 +74,11 @@ defmodule Japanese.Translation do
   # started. Override with `chain_budget_ms:`.
   @default_chain_budget_ms 220_000
   @min_attempt_ms 20_000
+
+  # Target size, in numbered lines, of the pieces a refused page is split
+  # into, and how many are translated at once.
+  @piece_lines 25
+  @piece_concurrency 4
 
   # A busy status/equipment screen came to ~1.9k output tokens on Sonnet 5.5
   # and ~3.3k on Sonnet 5 in testing; a dialogue box is far less. 8k leaves
@@ -305,16 +325,15 @@ defmodule Japanese.Translation do
     alias Japanese.Corpus.Story
     alias Japanese.Corpus.Page
 
+    label = "#{page.story} page #{page.number}"
+
     with {:ok, japanese_text} <- Page.get_japanese_text(page),
-         %__MODULE__{text: interleaved_translation} <-
-           ja_to_en(japanese_text, interleaved: true) do
+         {:ok, interleaved_translation} <- translate_page_text(japanese_text, label) do
       # The source text, not the model's echo of it, is what the translation is
       # aligned against — a line the model drops or alters can then only affect
       # its own line rather than the parity of the whole page.
       json =
-        Json.format_to_translation_json(interleaved_translation, japanese_text,
-          label: "#{page.story} page #{page.number}"
-        )
+        Json.format_to_translation_json(interleaved_translation, japanese_text, label: label)
 
       Page.update_translation(page, json)
 
@@ -332,6 +351,162 @@ defmodule Japanese.Translation do
   end
 
   defdelegate translate_page_async(page), to: Japanese.Translation.Service, as: :translate_page
+
+  @doc """
+  Translates a page's Japanese text into the numbered reply that
+  `Japanese.Translation.Json.format_to_translation_json/3` pairs with it.
+
+  The whole page is tried first. If every model refuses it, the page is
+  translated in pieces instead (see "Pages every model refuses" in the
+  moduledoc): the reply then holds only the lines of the pieces that were
+  translated, and the rest are saved untranslated. If every piece is refused
+  as well, the whole-page error is returned.
+  """
+  @spec translate_page_text(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
+  def translate_page_text(japanese_text, label \\ "unidentified page")
+      when is_binary(japanese_text) do
+    numbered = Json.number_source_lines(japanese_text)
+    deadline = System.monotonic_time(:millisecond) + chain_budget_ms()
+
+    case translate_numbered(numbered, deadline, :whole_page) do
+      {:ok, reply} ->
+        {:ok, reply}
+
+      {:error, reason} = error ->
+        if refused?(reason),
+          do: translate_in_pieces(numbered, deadline, label, error),
+          else: error
+    end
+  end
+
+  @doc """
+  Whether an error means the content was refused, as opposed to a failure
+  (an outage, a timeout) that retrying might fix.
+  """
+  @spec refused?(term()) :: boolean()
+  def refused?(:refused), do: true
+
+  def refused?({:all_models_failed, failures}) when is_list(failures),
+    do: failures != [] and Enum.all?(failures, fn {_entry, reason} -> refused?(reason) end)
+
+  def refused?(_reason), do: false
+
+  # One numbered text (a whole page, or a piece of one) through the chain.
+  # A reply that is clearly not a translation, typically a model explaining
+  # that it won't help, counts as a refusal so the chain moves on:
+  #   - a piece is merged by line number, so it needs numbered lines;
+  #   - a whole page goes through Json's pairing, which can also handle a
+  #     translation that ignored the numbering, so it only has to be roughly
+  #     page-sized when it has no numbered lines.
+  defp translate_numbered(numbered, deadline, kind) do
+    numbers = line_numbers(numbered)
+
+    accept = fn text ->
+      cond do
+        numbered_reply_lines(text, numbers) != [] -> :ok
+        kind == :whole_page and non_blank_lines(text) * 2 >= length(numbers) -> :ok
+        true -> {:error, :refused}
+      end
+    end
+
+    [literalness: :literal, interleaved: true]
+    |> build_ja_to_en_prompt()
+    |> call_llm(numbered, :ja_to_en, deadline: deadline, accept: accept)
+    |> handle_response(:ja_to_en)
+    |> case do
+      %__MODULE__{text: text} -> {:ok, text}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp translate_in_pieces(numbered, deadline, label, whole_page_error) do
+    pieces = split_into_pieces(numbered)
+
+    Logger.warning(
+      "Every model refused #{label}; translating it in #{length(pieces)} pieces instead."
+    )
+
+    results =
+      pieces
+      |> Task.async_stream(
+        fn piece -> {piece, translate_numbered(piece, deadline, :piece)} end,
+        max_concurrency: @piece_concurrency,
+        timeout: :infinity
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+
+    translated =
+      for {piece, {:ok, reply}} <- results,
+          do: numbered_reply_lines(reply, line_numbers(piece))
+
+    untranslated =
+      for {piece, {:error, reason}} <- results do
+        numbers = line_numbers(piece)
+        "lines #{List.first(numbers)}-#{List.last(numbers)} (#{inspect(reason)})"
+      end
+
+    case translated do
+      [] ->
+        Logger.warning("Every piece of #{label} was refused too.")
+        whole_page_error
+
+      _ ->
+        if untranslated != [] do
+          Logger.warning(
+            "#{label}: saved without a translation for " <> Enum.join(untranslated, ", ")
+          )
+        end
+
+        {:ok, translated |> List.flatten() |> Enum.join("\n")}
+    end
+  end
+
+  defp non_blank_lines(text),
+    do: text |> String.split("\n") |> Enum.count(&(String.trim(&1) != ""))
+
+  # The line numbers in a numbered text ("<n>\t<line>"; blank lines unnumbered).
+  defp line_numbers(numbered) do
+    for line <- String.split(numbered, "\n"),
+        [_, n] <- [Regex.run(~r/^(\d+)\t/, line)],
+        do: String.to_integer(n)
+  end
+
+  # The reply lines that translate one of `numbers`, normalised to
+  # "<n>\t<english>". Anything else (a preamble, an apology, a line number
+  # from outside the piece) is dropped, so pieces can't step on each other
+  # when they are joined.
+  defp numbered_reply_lines(reply, numbers) do
+    wanted = MapSet.new(numbers)
+
+    for line <- String.split(reply, "\n"),
+        [_, n, english] <- [Regex.run(~r/^\s*(\d+)[.):\t ][ \t]*(\S.*)$/u, line)],
+        MapSet.member?(wanted, String.to_integer(n)),
+        do: "#{n}\t#{String.trim_trailing(english)}"
+  end
+
+  # Splits a numbered page at paragraph breaks into pieces of about
+  # @piece_lines numbered lines. A paragraph longer than that is a piece of its
+  # own, cut at line boundaries.
+  defp split_into_pieces(numbered) do
+    numbered
+    |> String.split("\n")
+    |> Enum.chunk_by(&(&1 == ""))
+    |> Enum.reject(&(hd(&1) == ""))
+    |> Enum.flat_map(&Enum.chunk_every(&1, @piece_lines))
+    |> Enum.chunk_while(
+      [],
+      fn paragraph, piece ->
+        if piece != [] and length(List.flatten(piece)) + length(paragraph) > @piece_lines,
+          do: {:cont, Enum.reverse(piece), [paragraph]},
+          else: {:cont, [paragraph | piece]}
+      end,
+      fn
+        [] -> {:cont, []}
+        piece -> {:cont, Enum.reverse(piece), []}
+      end
+    )
+    |> Enum.map(fn paragraphs -> Enum.map_join(paragraphs, "\n\n", &Enum.join(&1, "\n")) end)
+  end
 
   @doc """
   The model chain for an operation: `"provider/model"` entries, tried in
@@ -479,9 +654,17 @@ defmodule Japanese.Translation do
   #   - the error itself, when only one entry was tried
   #   - {:all_models_failed, [{entry, reason}, ...]} when several were
   #   - :no_model_available when no entry's provider has an API key
+  #
+  # Options (besides those passed on to the provider, like :max_tokens):
+  #   - :deadline (monotonic ms) shared by several calls; defaults to now plus
+  #     the chain budget. No attempt starts with under @min_attempt_ms left.
+  #   - :accept, fn reply_text -> :ok | {:error, reason}: a reply it rejects
+  #     counts as that entry failing, and the chain moves on.
   defp call_llm(system_prompt, user_content, operation, opts \\ []) do
     entries = operation |> chain() |> Enum.map(&{&1, parse_spec(&1)})
-    deadline = System.monotonic_time(:millisecond) + chain_budget_ms()
+    {deadline, opts} = Keyword.pop(opts, :deadline)
+    deadline = deadline || System.monotonic_time(:millisecond) + chain_budget_ms()
+    {accept, opts} = Keyword.pop(opts, :accept, fn _text -> :ok end)
 
     entries
     |> Enum.reduce_while([], fn {spec, target}, failures ->
@@ -492,14 +675,19 @@ defmodule Japanese.Translation do
           Logger.info("Skipping #{spec} (#{operation}): no API key for its provider.")
           {:cont, failures}
 
-        failures != [] and left < @min_attempt_ms ->
+        left < @min_attempt_ms ->
           Logger.warning("Skipping #{spec} (#{operation}): only #{left}ms of the budget left.")
-          {:halt, failures}
+          {:halt, [{spec, :timeout} | failures]}
 
         true ->
           timeout = min(left, receive_timeout())
 
-          case attempt(target, system_prompt, user_content, operation, opts, timeout) do
+          with {:ok, response} <-
+                 attempt(target, system_prompt, user_content, operation, opts, timeout),
+               :ok <- accept_reply(response, accept) do
+            {:ok, response}
+          end
+          |> case do
             {:ok, response} ->
               if failures != [] do
                 Logger.warning(
@@ -521,6 +709,13 @@ defmodule Japanese.Translation do
       [] -> {:error, :no_model_available}
       [{_spec, reason}] -> {:error, reason}
       failures -> {:error, {:all_models_failed, Enum.reverse(failures)}}
+    end
+  end
+
+  defp accept_reply(response, accept) do
+    case first_text(response.content) do
+      nil -> :ok
+      text -> accept.(text)
     end
   end
 
