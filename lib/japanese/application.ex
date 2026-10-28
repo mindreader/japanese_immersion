@@ -9,6 +9,16 @@ defmodule Japanese.Application do
 
   @impl Application
   def start(_type, _args) do
+    # Fail at boot on a malformed TRANSLATION_CHAIN, and say what's in use.
+    chains = Japanese.Translation.validate_chains!()
+
+    Logger.info(
+      "Translation model chains: " <>
+        Enum.map_join(chains, "; ", fn {operation, chain} ->
+          "#{operation}: #{Enum.join(chain, ", ")}"
+        end)
+    )
+
     children = [
       JapaneseWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:japanese, :dns_cluster_query) || :ignore},

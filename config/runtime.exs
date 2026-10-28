@@ -34,7 +34,22 @@ config :japanese, Japanese.Games.Vision,
 config :japanese, Japanese.Games.Deck, ssh_key: System.get_env("DECK_SSH_KEY")
 
 if config_env() != :test do
-  config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
+  # The translation model chain: comma-separated "provider/model" entries,
+  # tried in order until one answers, e.g.
+  #   TRANSLATION_CHAIN=anthropic/claude-opus-5,openrouter/google/gemini-3.8-flash
+  # TRANSLATION_CHAIN_<OPERATION> overrides it for one operation (JA_TO_EN,
+  # EN_TO_JA, EXPLAIN, SCREENSHOT; screenshots need vision models). Unset or
+  # empty: the built-in default. Checked at startup; see
+  # Japanese.Translation.chain/1.
+  config :japanese, Japanese.Translation,
+    api_key: System.get_env("ANTHROPIC_API_KEY"),
+    chain: System.get_env("TRANSLATION_CHAIN"),
+    chains: %{
+      ja_to_en: System.get_env("TRANSLATION_CHAIN_JA_TO_EN"),
+      en_to_ja: System.get_env("TRANSLATION_CHAIN_EN_TO_JA"),
+      explain: System.get_env("TRANSLATION_CHAIN_EXPLAIN"),
+      screenshot: System.get_env("TRANSLATION_CHAIN_SCREENSHOT")
+    }
 
   # Optional. Enables the "openrouter/..." entries of the translation model
   # chain (see Japanese.Translation.chain/1); without it they are skipped.

@@ -343,7 +343,16 @@ defmodule Japanese.Translation do
         # per-operation override
         chains: %{explain: ["anthropic/claude-haiku-5"]}
 
-  A single string is a one-entry chain. With nothing configured the chain is
+  At runtime these come from environment variables (see `config/runtime.exs`):
+  `TRANSLATION_CHAIN` for the shared chain and `TRANSLATION_CHAIN_JA_TO_EN`,
+  `_EN_TO_JA`, `_EXPLAIN` or `_SCREENSHOT` for one operation, each a
+  comma-separated list:
+
+      TRANSLATION_CHAIN=anthropic/claude-opus-5,openrouter/google/gemini-3.8-flash
+
+  So a string is split on commas (one entry with no commas is a one-entry
+  chain), and a `nil`, blank or empty value counts as unset: the operation's
+  entry falls back to the shared chain, and that to
   #{inspect(@default_chain)}.
 
   `:screenshot` (game screenshots, see `transcribe_screenshot/3`) sends an
@@ -352,12 +361,38 @@ defmodule Japanese.Translation do
   @spec chain(operation()) :: [String.t()]
   def chain(operation) when operation in @operations do
     config = Application.get_env(:japanese, __MODULE__, [])
-    chains = Keyword.get(config, :chains, %{})
+    chains = Keyword.get(config, :chains) || %{}
 
-    case Map.get(chains, operation) || Keyword.get(config, :chain, @default_chain) do
-      spec when is_binary(spec) -> [spec]
-      specs when is_list(specs) -> specs
+    normalize_chain(Map.get(chains, operation)) ||
+      normalize_chain(Keyword.get(config, :chain)) ||
+      @default_chain
+  end
+
+  # A configured chain as a list of entries, or nil when it is unset/empty.
+  defp normalize_chain(nil), do: nil
+
+  defp normalize_chain(spec) when is_binary(spec),
+    do: spec |> String.split(",") |> normalize_chain()
+
+  defp normalize_chain(specs) when is_list(specs) do
+    case specs |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == "")) do
+      [] -> nil
+      specs -> specs
     end
+  end
+
+  @doc """
+  Checks every operation's chain, raising `ArgumentError` on a bad entry, and
+  returns the chains. Called at startup so a typo in `TRANSLATION_CHAIN`
+  stops the app booting instead of failing the first translation.
+  """
+  @spec validate_chains!() :: %{operation() => [String.t()]}
+  def validate_chains! do
+    Map.new(@operations, fn operation ->
+      chain = chain(operation)
+      Enum.each(chain, &parse_spec/1)
+      {operation, chain}
+    end)
   end
 
   @doc """

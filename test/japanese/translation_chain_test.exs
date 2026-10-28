@@ -41,6 +41,42 @@ defmodule Test.Japanese.Translation.Chain do
       assert Translation.chain(:ja_to_en) == ["anthropic/claude-opus-5"]
     end
 
+    test "a comma-separated string (as from TRANSLATION_CHAIN) is split and trimmed" do
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        chain: " anthropic/claude-opus-5 , openrouter/google/gemini-3.8-flash,",
+        chains: %{screenshot: "openrouter/google/gemini-3.8-flash"}
+      )
+
+      assert Translation.chain(:ja_to_en) ==
+               ["anthropic/claude-opus-5", "openrouter/google/gemini-3.8-flash"]
+
+      assert Translation.chain(:screenshot) == ["openrouter/google/gemini-3.8-flash"]
+    end
+
+    test "unset or empty values fall through, as runtime.exs passes them" do
+      # What config/runtime.exs produces with no TRANSLATION_CHAIN* set...
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        chain: nil,
+        chains: %{ja_to_en: nil, en_to_ja: nil, explain: nil, screenshot: nil}
+      )
+
+      default = Translation.chain(:ja_to_en)
+      assert ["anthropic/" <> _ | _] = default
+
+      # ...and with some set to empty strings or just commas.
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        chain: "",
+        chains: %{explain: " , ", ja_to_en: "anthropic/claude-opus-5"}
+      )
+
+      assert Translation.chain(:explain) == default
+      assert Translation.chain(:en_to_ja) == default
+      assert Translation.chain(:ja_to_en) == ["anthropic/claude-opus-5"]
+    end
+
     test "every default entry parses" do
       Application.put_env(:japanese, Translation, api_key: "dummy-key")
 
@@ -49,6 +85,28 @@ defmodule Test.Japanese.Translation.Chain do
         assert provider in [:anthropic, :openrouter]
         assert model != ""
       end
+    end
+  end
+
+  describe "validate_chains!/0" do
+    test "returns every operation's chain" do
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        chains: %{explain: "anthropic/claude-haiku-5"}
+      )
+
+      chains = Translation.validate_chains!()
+      assert Map.keys(chains) |> Enum.sort() == [:en_to_ja, :explain, :ja_to_en, :screenshot]
+      assert chains.explain == ["anthropic/claude-haiku-5"]
+    end
+
+    test "raises on a bad entry in any operation's chain" do
+      Application.put_env(:japanese, Translation,
+        api_key: "dummy-key",
+        chains: %{screenshot: "anthropic/claude-sonnet-5-5,gemini-3.8-flash"}
+      )
+
+      assert_raise ArgumentError, ~r/"gemini-3.8-flash"/, &Translation.validate_chains!/0
     end
   end
 
