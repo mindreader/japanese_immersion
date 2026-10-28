@@ -37,7 +37,7 @@ defmodule Japanese.Games.Pipeline do
   defp transcribe(shot, image, media_type, ocr) do
     started = System.monotonic_time(:millisecond)
 
-    with {:ok, reply} <-
+    with {:ok, reply, model} <-
            Translation.transcribe_screenshot(image, media_type, Vision.format_lines(ocr.lines)),
          {:ok, transcript} <- Transcript.parse(reply, ocr.text) do
       Logger.debug(
@@ -45,7 +45,7 @@ defmodule Japanese.Games.Pipeline do
           inspect(transcript.description)
       )
 
-      {:ok, finish(shot, transcript, ocr_text: ocr.text, model: Translation.model(:screenshot))}
+      {:ok, finish(shot, transcript, ocr_text: ocr.text, model: model)}
     end
   end
 

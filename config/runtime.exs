@@ -38,8 +38,8 @@ config :japanese, Japanese.Games.Deck, ssh_key: System.get_env("DECK_SSH_KEY")
 if config_env() != :test do
   config :japanese, Japanese.Translation, api_key: System.get_env("ANTHROPIC_API_KEY")
 
-  # Optional. When set, a request Claude refuses is retried on other models
-  # through OpenRouter (Japanese.Translation's :fallback_models).
+  # Optional. Enables the "openrouter/..." entries of the translation model
+  # chain (see Japanese.Translation.chain/1); without it they are skipped.
   config :japanese, Japanese.OpenRouter, api_key: System.get_env("OPENROUTER_API_KEY")
 
   corpus_dir =

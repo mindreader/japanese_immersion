@@ -1,7 +1,7 @@
 defmodule Japanese.OpenRouter do
   @moduledoc """
-  Minimal OpenRouter chat-completions client, used as a fallback when Claude
-  declines a request (see `Japanese.Translation`).
+  Minimal OpenRouter chat-completions client, for the `openrouter/...` entries
+  of `Japanese.Translation`'s model chain.
 
   OpenRouter speaks the OpenAI chat-completions format for every model it
   routes to, so one client covers DeepSeek, Gemini, Qwen and the rest.
@@ -25,7 +25,9 @@ defmodule Japanese.OpenRouter do
   def configured?, do: match?({:ok, _}, api_key())
 
   @doc """
-  Sends one system prompt + user message to `model`.
+  Sends one system prompt + user message to `model` (an OpenRouter model id
+  such as `"google/gemini-3.8-flash"`). The user message is a string or a
+  list of OpenAI-format content parts (`text` / `image_url`).
 
   Returns `{:ok, completion}` with the reply text, or an error:
 
@@ -40,16 +42,17 @@ defmodule Japanese.OpenRouter do
     * `:max_tokens` (default 16_384)
     * `:receive_timeout` in ms (default 180_000)
   """
-  @spec chat(String.t(), String.t(), String.t(), Keyword.t()) ::
+  @spec chat(String.t(), String.t(), String.t() | [map()], Keyword.t()) ::
           {:ok, completion()} | {:error, term()}
-  def chat(model, system_prompt, user_text, opts \\ [])
-      when is_binary(model) and is_binary(system_prompt) and is_binary(user_text) do
+  def chat(model, system_prompt, user_content, opts \\ [])
+      when is_binary(model) and is_binary(system_prompt) and
+             (is_binary(user_content) or is_list(user_content)) do
     with {:ok, key} <- api_key() do
       body = %{
         model: model,
         messages: [
           %{role: "system", content: system_prompt},
-          %{role: "user", content: user_text}
+          %{role: "user", content: user_content}
         ],
         max_tokens: Keyword.get(opts, :max_tokens, 16_384),
         # Reasoning models: keep any thinking out of the reply text.

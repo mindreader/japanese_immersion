@@ -44,14 +44,23 @@ defmodule Test.JapaneseWeb.TranslationErrors do
   describe "translation_message/1" do
     test "names a refusal instead of calling it an invalid response" do
       assert TranslationErrors.translation_message(:refused) =~ "declined"
-      assert TranslationErrors.translation_message(:fallbacks_failed) =~ "fallback models"
       refute TranslationErrors.translation_message(:refused) =~ "invalid"
+    end
+
+    test "tells a chain of refusals apart from a chain of failures" do
+      refused = [{"anthropic/a", :refused}, {"openrouter/b", :refused}]
+      mixed = [{"anthropic/a", :refused}, {"openrouter/b", {:openrouter_http, 503, "busy"}}]
+
+      assert TranslationErrors.translation_message({:all_models_failed, refused}) =~ "declined"
+      assert TranslationErrors.translation_message({:all_models_failed, mixed}) =~ "failed"
     end
 
     test "is short and debris-free for any reason" do
       for reason <- [
             :refused,
-            :fallbacks_failed,
+            {:all_models_failed, [{"anthropic/a", :refused}]},
+            {:all_models_failed, [{"anthropic/a", %RuntimeError{message: "boom"}}]},
+            :no_model_available,
             :timeout,
             :crashed,
             :invalid_response,

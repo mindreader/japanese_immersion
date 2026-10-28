@@ -41,53 +41,10 @@ defmodule Test.Japanese.Translation do
   }
   setup do
     Mimic.stub(Anthropix, :chat, fn _client, _opts -> {:error, :llm_error} end)
+    # No OpenRouter by default: the chain is just its Anthropic entry, as if
+    # OPENROUTER_API_KEY were unset. Tests of the chain turn it on.
+    Mimic.stub(Japanese.OpenRouter, :configured?, fn -> false end)
     :ok
-  end
-
-  describe "model/1" do
-    setup do
-      original = Application.get_env(:japanese, Translation, [])
-      on_exit(fn -> Application.put_env(:japanese, Translation, original) end)
-      :ok
-    end
-
-    test "falls back to the compiled-in default when unset" do
-      Application.put_env(:japanese, Translation, api_key: "dummy-key")
-
-      assert Translation.model(:ja_to_en) == "claude-sonnet-5-5"
-      assert Translation.model(:en_to_ja) == "claude-sonnet-5-5"
-      assert Translation.model(:explain) == "claude-sonnet-5-5"
-    end
-
-    test "uses the configured shared :model for every operation" do
-      Application.put_env(:japanese, Translation, api_key: "dummy-key", model: "claude-opus-5")
-
-      assert Translation.model(:ja_to_en) == "claude-opus-5"
-      assert Translation.model(:en_to_ja) == "claude-opus-5"
-      assert Translation.model(:explain) == "claude-opus-5"
-    end
-
-    test "a per-operation entry in :models overrides the shared :model" do
-      Application.put_env(:japanese, Translation,
-        api_key: "dummy-key",
-        model: "claude-opus-5",
-        models: %{explain: "claude-haiku-5"}
-      )
-
-      assert Translation.model(:explain) == "claude-haiku-5"
-      assert Translation.model(:ja_to_en) == "claude-opus-5"
-      assert Translation.model(:en_to_ja) == "claude-opus-5"
-    end
-
-    test "a per-operation entry in :models overrides the compiled-in default" do
-      Application.put_env(:japanese, Translation,
-        api_key: "dummy-key",
-        models: %{ja_to_en: "claude-haiku-5"}
-      )
-
-      assert Translation.model(:ja_to_en) == "claude-haiku-5"
-      assert Translation.model(:en_to_ja) == "claude-sonnet-5-5"
-    end
   end
 
   describe "Anthropic client" do
@@ -264,7 +221,7 @@ defmodule Test.Japanese.Translation do
     end
   end
 
-  describe "refusals" do
+  describe "model chain" do
     alias Japanese.OpenRouter
 
     @refusal %{
@@ -288,25 +245,40 @@ defmodule Test.Japanese.Translation do
        }}
     end
 
+    # The default chain's OpenRouter entries, as OpenRouter model ids.
+    defp openrouter_models(operation) do
+      for "openrouter/" <> model <- Translation.chain(operation), do: model
+    end
+
+    test "Claude answering normally never touches OpenRouter" do
+      Mimic.stub(OpenRouter, :configured?, fn -> true end)
+      Mimic.reject(&OpenRouter.chat/4)
+
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        assert opts[:model] == "claude-sonnet-5-5"
+        {:ok, @anthropix_response_en}
+      end)
+
+      assert %Translation{text: "This is a test", model: "anthropic/claude-sonnet-5-5"} =
+               Translation.ja_to_en("テスト", [])
+    end
+
     test "an empty refusal is :refused, not :invalid_response" do
-      Mimic.stub(OpenRouter, :configured?, fn -> false end)
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @refusal} end)
 
       assert {:error, :refused} = Translation.ja_to_en("テスト", [])
     end
 
     test "a refusal partway through is a failure, not a short translation" do
-      Mimic.stub(OpenRouter, :configured?, fn -> false end)
-
       partial = Map.put(@refusal, "content", [%{"type" => "text", "text" => "The first half"}])
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, partial} end)
 
       assert {:error, :refused} = Translation.ja_to_en("テスト", [])
     end
 
-    test "falls back to the first OpenRouter model, with the same prompt" do
+    test "a refusal moves on to the next entry, with the same prompt" do
       Mimic.stub(OpenRouter, :configured?, fn -> true end)
-      [first | _] = Translation.fallback_models()
+      [first | _] = openrouter_models(:ja_to_en)
 
       Mimic.expect(Anthropix, :chat, fn _client, opts ->
         send(self(), {:claude, opts[:system], opts[:messages]})
@@ -320,40 +292,55 @@ defmodule Test.Japanese.Translation do
         completion("This is a test", first)
       end)
 
-      assert %Translation{text: "This is a test", model: ^first, usage: usage} =
+      assert %Translation{text: "This is a test", model: model, usage: usage} =
                Translation.ja_to_en("テスト", [])
 
+      assert model == "openrouter/" <> first
       assert usage.output_tokens == 900
     end
 
-    test "tries the next model when one refuses or errors" do
+    test "an Anthropic error (not just a refusal) moves on too" do
       Mimic.stub(OpenRouter, :configured?, fn -> true end)
-      [first, second | _] = Translation.fallback_models()
+      [first | _] = openrouter_models(:ja_to_en)
+      Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:error, :llm_error} end)
+      Mimic.expect(OpenRouter, :chat, fn ^first, _s, _u, _o -> completion("Rescued", first) end)
+
+      assert %Translation{text: "Rescued"} = Translation.ja_to_en("テスト", [])
+    end
+
+    test "goes down the chain in order until one answers" do
+      Mimic.stub(OpenRouter, :configured?, fn -> true end)
+      [first, second, third | _] = openrouter_models(:ja_to_en)
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @refusal} end)
 
-      Mimic.expect(OpenRouter, :chat, 2, fn
-        ^first, _system, _user, _opts -> {:error, :refused}
-        ^second, _system, _user, _opts -> completion("Second time lucky", second)
+      Mimic.expect(OpenRouter, :chat, 3, fn
+        ^first, _s, _u, _o -> {:error, :refused}
+        ^second, _s, _u, _o -> {:error, {:openrouter_http, 503, "busy"}}
+        ^third, _s, _u, _o -> completion("Third time lucky", third)
       end)
 
-      assert %Translation{text: "Second time lucky", model: ^second} =
+      assert %Translation{text: "Third time lucky", model: model} =
                Translation.ja_to_en("テスト", [])
+
+      assert model == "openrouter/" <> third
     end
 
-    test ":fallbacks_failed when every fallback fails" do
+    test "every entry failing lists each failure" do
       Mimic.stub(OpenRouter, :configured?, fn -> true end)
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @refusal} end)
 
-      Mimic.expect(OpenRouter, :chat, length(Translation.fallback_models()), fn
-        _model, _system, _user, _opts -> {:error, {:openrouter_http, 503, "busy"}}
+      Mimic.expect(OpenRouter, :chat, length(openrouter_models(:ja_to_en)), fn
+        _model, _system, _user, _opts -> {:error, :refused}
       end)
 
-      assert {:error, :fallbacks_failed} = Translation.ja_to_en("テスト", [])
+      assert {:error, {:all_models_failed, failures}} = Translation.ja_to_en("テスト", [])
+      assert Enum.map(failures, &elem(&1, 0)) == Translation.chain(:ja_to_en)
+      assert Enum.all?(failures, &match?({_entry, :refused}, &1))
     end
 
-    test "explanations fall back too" do
+    test "explanations use the chain too" do
       Mimic.stub(OpenRouter, :configured?, fn -> true end)
-      [first | _] = Translation.fallback_models()
+      [first | _] = openrouter_models(:explain)
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @refusal} end)
 
       Mimic.expect(OpenRouter, :chat, fn ^first, _s, _u, _o ->
@@ -363,21 +350,26 @@ defmodule Test.Japanese.Translation do
       assert "A breakdown" = Translation.explain_text("テスト")
     end
 
-    test "screenshots don't fall back (their request carries an image)" do
+    test "screenshots send their image to OpenRouter in its format" do
       Mimic.stub(OpenRouter, :configured?, fn -> true end)
-      Mimic.reject(&OpenRouter.chat/4)
+      [first | _] = openrouter_models(:screenshot)
       Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @refusal} end)
 
-      assert {:error, :refused} = Translation.transcribe_screenshot("png", "image/png", "[x] テスト")
-    end
+      Mimic.expect(OpenRouter, :chat, fn ^first, _system, user, opts ->
+        assert [
+                 %{type: "image_url", image_url: %{url: "data:image/png;base64," <> data}},
+                 %{type: "text", text: "OCR lines" <> _}
+               ] = user
 
-    test "Claude answering normally never touches OpenRouter" do
-      Mimic.stub(OpenRouter, :configured?, fn -> true end)
-      Mimic.reject(&OpenRouter.chat/4)
-      Mimic.expect(Anthropix, :chat, fn _client, _opts -> {:ok, @anthropix_response_en} end)
+        assert Base.decode64!(data) == "png bytes"
+        assert opts[:max_tokens] == 8192
+        completion(~s|{"description": "menu"}|, first)
+      end)
 
-      assert %Translation{text: "This is a test", model: "claude-sonnet-4-20250514"} =
-               Translation.ja_to_en("テスト", [])
+      assert {:ok, ~s|{"description": "menu"}|, model} =
+               Translation.transcribe_screenshot("png bytes", "image/png", "[x] テスト")
+
+      assert model == "openrouter/" <> first
     end
   end
 end

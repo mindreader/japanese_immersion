@@ -36,14 +36,16 @@ defmodule JapaneseWeb.TranslationErrors do
   """
   @spec translation_message(term()) :: String.t()
   def translation_message(:refused),
-    do:
-      "Claude declined to translate this page. Set OPENROUTER_API_KEY to retry " <>
-        "refusals on other models."
+    do: "The model declined to translate this page, and no other model was available to try."
 
-  def translation_message(:fallbacks_failed),
-    do:
-      "Claude declined to translate this page, and the fallback models failed too. " <>
-        "The server log has the details."
+  def translation_message({:all_models_failed, failures}) when is_list(failures) do
+    if Enum.all?(failures, &match?({_entry, :refused}, &1)),
+      do: "Every model in the chain declined to translate this page.",
+      else: "Every model in the chain failed. The server log has the details."
+  end
+
+  def translation_message(:no_model_available),
+    do: "No translation model is available. Check the API keys."
 
   def translation_message(:timeout), do: "Translation timed out. Please try again."
 

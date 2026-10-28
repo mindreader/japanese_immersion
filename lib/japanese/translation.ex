@@ -5,53 +5,60 @@ defmodule Japanese.Translation do
   This module is also a struct representing a translation result, with fields:
     - :text (the translated text)
     - :usage (the usage struct)
+    - :model (the model chain entry that produced it, e.g. "anthropic/claude-sonnet-5-5")
 
-  ## Model selection
+  ## Model chain
 
-  The Anthropic model is configured rather than pinned in code (see `model/1`).
-  We default to the unpinned `"claude-sonnet-5-5"` alias (Sonnet 5.5) instead of a dated
-  snapshot id: a dated id is perfectly reproducible but eventually gets
+  Each operation runs through an ordered chain of `"provider/model"` entries;
+  the first one that answers wins. The provider is the first segment and the
+  rest is that provider's own model id, so the same model can be listed once
+  per provider:
+
+      ["anthropic/claude-sonnet-5-5",            # Anthropic's API directly
+       "openrouter/anthropic/claude-sonnet-5.5", # the same model via OpenRouter
+       "openrouter/google/gemini-3.8-flash"]     # another vendor entirely
+
+  Providers: `anthropic` (needs `ANTHROPIC_API_KEY`) and `openrouter` (needs
+  `OPENROUTER_API_KEY`, see `Japanese.OpenRouter`). An entry whose provider
+  has no key is skipped. Note model ids differ between providers (Anthropic's
+  `claude-sonnet-5-5` is OpenRouter's `anthropic/claude-sonnet-5.5`).
+
+  Any failure moves on to the next entry: a refusal (Claude's
+  `stop_reason: "refusal"`, which sometimes hits perfectly ordinary fiction,
+  or another provider's content filter), an outage that outlasts the retries,
+  or a timeout. See `chain/1` for configuration and the default.
+
+  The Anthropic entry uses the unpinned `claude-sonnet-5-5` alias rather than
+  a dated snapshot: a dated id is perfectly reproducible but eventually gets
   deprecated and starts hard-failing, while an alias keeps working but means
   behaviour can drift underneath us without a code change. For this app's
-  workload — bulk literal translation, judged mainly on faithfulness rather
-  than creative quality — we're accepting that drift risk in exchange for not
-  having to chase deprecations.
-
-  ## Refusals and the OpenRouter fallback
-
-  Claude occasionally declines a request outright (`stop_reason: "refusal"`),
-  sometimes on perfectly ordinary fiction. That is reported as
-  `{:error, :refused}` rather than as a malformed response, and if an
-  OpenRouter key is configured (`Japanese.OpenRouter`) the same prompt is then
-  tried on each of the `:fallback_models` in turn (see `fallback_models/0`).
-  The first one that answers wins. Game screenshots are not retried this way:
-  their request includes an image in Anthropic's format.
-
-  If every fallback also fails, the result is `{:error, :fallbacks_failed}`
-  (each attempt is logged).
+  workload (bulk literal translation, judged mainly on faithfulness) we accept
+  that drift in exchange for not chasing deprecations.
   """
 
   require Logger
 
-  # Cheaper than an Opus-class model with a much larger output ceiling and a
-  # 1M context, which comfortably covers whole-page interleaved translation.
-  # Switching to "claude-opus-5" for higher quality is a config-only change
-  # (see `model/1`) if this default ever proves insufficient.
-  @default_model "claude-sonnet-5-5"
+  # Sonnet first: cheaper than an Opus-class model with a much larger output
+  # ceiling and a 1M context, which covers whole-page interleaved translation.
+  # Then the same model through OpenRouter, for an Anthropic API outage (it
+  # won't get past a refusal: OpenRouter moderates its Anthropic models).
+  # Then two other vendors, so one provider's moderation can't block both.
+  @default_chain [
+    "anthropic/claude-sonnet-5-5",
+    "openrouter/anthropic/claude-sonnet-5.5",
+    "openrouter/google/gemini-3.8-flash",
+    "openrouter/deepseek/deepseek-v4.1-flash"
+  ]
 
-  # Tried in order, through OpenRouter, when Claude refuses. Two different
-  # vendors, so one provider's moderation can't block both. Override with
-  # `config :japanese, Japanese.Translation, fallback_models: [...]`; an empty
-  # list turns the fallback off.
-  @default_fallback_models ["google/gemini-3.8-flash", "deepseek/deepseek-v4.1-flash"]
+  @operations [:ja_to_en, :en_to_ja, :explain, :screenshot]
 
-  # The fallback chain must finish inside the async translation ceiling
-  # (Japanese.Translation.Service.timeout_ms/0, 240s by default), counting the
-  # Claude call that refused. Each fallback's receive timeout is cut to what
-  # is left of this budget, and a fallback with under @min_fallback_ms left
-  # isn't started.
-  @default_fallback_budget_ms 220_000
-  @min_fallback_ms 20_000
+  # The whole chain must finish inside the async translation ceiling
+  # (Japanese.Translation.Service.timeout_ms/0, 240s by default). Each
+  # attempt's receive timeout is cut to what is left of this budget, and once
+  # one attempt has failed, an entry with under @min_attempt_ms left isn't
+  # started. Override with `chain_budget_ms:`.
+  @default_chain_budget_ms 220_000
+  @min_attempt_ms 20_000
 
   # A busy status/equipment screen came to ~1.9k output tokens on Sonnet 5.5
   # and ~3.3k on Sonnet 5 in testing; a dialogue box is far less. 8k leaves
@@ -101,11 +108,14 @@ defmodule Japanese.Translation do
   @enforce_keys [:text]
   defstruct [:text, :usage, :model]
 
+  @typedoc "A translation, with the chain entry (`\"provider/model\"`) that produced it."
   @type t :: %__MODULE__{
           text: String.t(),
           usage: Japanese.Schemas.Anthropic.Response.Usage.t(),
           model: String.t() | nil
         }
+
+  @type operation :: :ja_to_en | :en_to_ja | :explain | :screenshot
 
   @doc """
   Translates Japanese text to English.
@@ -254,13 +264,13 @@ defmodule Japanese.Translation do
   authority on which characters are present and to use the image only for
   layout, grouping and the cursor — see `priv/games/screenshot.txt`.
 
-  Returns the model's raw reply text (expected to be one JSON object), or an
-  error. Parsing and post-processing live in `Japanese.Games.Transcript`; a
-  reply cut off by `max_tokens` is reported as `{:error, :truncated}` rather
-  than handed on as half a JSON object.
+  Returns the model's raw reply text (expected to be one JSON object) and the
+  chain entry that wrote it, or an error. Parsing and post-processing live in
+  `Japanese.Games.Transcript`; a reply cut off by `max_tokens` is reported as
+  `{:error, :truncated}` rather than handed on as half a JSON object.
   """
   @spec transcribe_screenshot(binary(), String.t(), String.t()) ::
-          {:ok, String.t()} | {:error, term()}
+          {:ok, String.t(), String.t()} | {:error, term()}
   def transcribe_screenshot(image, media_type, ocr_lines)
       when is_binary(image) and is_binary(media_type) and is_binary(ocr_lines) do
     system_prompt = File.read!(Application.app_dir(:japanese, "priv/games/screenshot.txt"))
@@ -276,10 +286,10 @@ defmodule Japanese.Translation do
       }
     ]
 
-    case call_anthropix(system_prompt, content, :screenshot, max_tokens: @screenshot_max_tokens)
-         |> handle_response(:screenshot) do
-      {:error, reason} -> {:error, reason}
-      text when is_binary(text) -> {:ok, text}
+    with {:ok, response} <-
+           call_llm(system_prompt, content, :screenshot, max_tokens: @screenshot_max_tokens),
+         text when is_binary(text) <- handle_response({:ok, response}, :screenshot) do
+      {:ok, text, response.model}
     end
   end
 
@@ -324,38 +334,46 @@ defmodule Japanese.Translation do
   defdelegate translate_page_async(page), to: Japanese.Translation.Service, as: :translate_page
 
   @doc """
-  Returns the Anthropic model id to use for the given operation.
+  The model chain for an operation: `"provider/model"` entries, tried in
+  order until one answers (see the moduledoc).
 
-  Configurable via `config :japanese, Japanese.Translation, model: "..."` (a
-  shared default) and/or
-  `models: %{ja_to_en: "...", en_to_ja: "...", explain: "...", screenshot: "..."}`
-  (a per-operation override). A per-operation entry wins over the shared
-  `:model`, which itself falls back to #{inspect(@default_model)} if unset.
+      config :japanese, Japanese.Translation,
+        # shared by every operation
+        chain: ["anthropic/claude-sonnet-5-5", "openrouter/google/gemini-3.8-flash"],
+        # per-operation override
+        chains: %{explain: ["anthropic/claude-haiku-5"]}
 
-  `:screenshot` is the game-screenshot transcription (see
-  `transcribe_screenshot/3`). It needs a vision-capable model.
+  A single string is a one-entry chain. With nothing configured the chain is
+  #{inspect(@default_chain)}.
+
+  `:screenshot` (game screenshots, see `transcribe_screenshot/3`) sends an
+  image, so its entries need vision-capable models.
   """
-  @spec model(:ja_to_en | :en_to_ja | :explain | :screenshot) :: String.t()
-  def model(operation)
-      when operation in [:ja_to_en, :en_to_ja, :explain, :screenshot] do
+  @spec chain(operation()) :: [String.t()]
+  def chain(operation) when operation in @operations do
     config = Application.get_env(:japanese, __MODULE__, [])
-    models = Keyword.get(config, :models, %{})
+    chains = Keyword.get(config, :chains, %{})
 
-    Map.get(models, operation) || Keyword.get(config, :model, @default_model)
+    case Map.get(chains, operation) || Keyword.get(config, :chain, @default_chain) do
+      spec when is_binary(spec) -> [spec]
+      specs when is_list(specs) -> specs
+    end
   end
 
   @doc """
-  OpenRouter model ids tried, in order, when Claude refuses a text request.
+  Splits a chain entry into its provider and that provider's model id.
 
-  Configurable via `config :japanese, Japanese.Translation, fallback_models: [...]`;
-  defaults to #{inspect(@default_fallback_models)}. Only used when
-  `Japanese.OpenRouter` has an API key.
+  Raises `ArgumentError` for an unknown provider or a missing model, so a
+  typo in the configuration fails loudly instead of being skipped.
   """
-  @spec fallback_models() :: [String.t()]
-  def fallback_models do
-    :japanese
-    |> Application.get_env(__MODULE__, [])
-    |> Keyword.get(:fallback_models, @default_fallback_models)
+  @spec parse_spec(String.t()) :: {:anthropic | :openrouter, String.t()}
+  def parse_spec("anthropic/" <> model) when model != "", do: {:anthropic, model}
+  def parse_spec("openrouter/" <> model) when model != "", do: {:openrouter, model}
+
+  def parse_spec(spec) do
+    raise ArgumentError,
+          "bad model chain entry #{inspect(spec)}: expected \"anthropic/<model>\" or " <>
+            "\"openrouter/<vendor>/<model>\""
   end
 
   defp build_ja_to_en_prompt(opts) do
@@ -396,15 +414,12 @@ defmodule Japanese.Translation do
     "Translate this English text to Japanese. Keep the meaning and tone as close as possible."
   end
 
-  defp build_client do
-    config = Application.fetch_env!(:japanese, __MODULE__)
-    api_key = config[:api_key]
+  defp build_client(receive_timeout) do
+    api_key = Application.fetch_env!(:japanese, __MODULE__)[:api_key]
 
     if is_nil(api_key) do
       raise "ANTHROPIC_API_KEY is not set in config or environment"
     end
-
-    receive_timeout = Keyword.get(config, :receive_timeout, @default_receive_timeout)
 
     # finch: [name: Japanese.Finch] routes through our own pool, which sets
     # conn_max_idle_time (see Japanese.Application). Without it, Anthropix's
@@ -423,72 +438,91 @@ defmodule Japanese.Translation do
     )
   end
 
-  # Claude first; if it refuses a plain-text request, the OpenRouter fallback
-  # chain. Returns the same {:ok, %Response{}} | {:error, reason} shape as
-  # call_anthropix/4, so handle_response/2 doesn't care who answered.
+  # Runs the operation's model chain (see chain/1): each entry in turn until
+  # one answers. Returns {:ok, %Response{}} with `model` set to the chain
+  # entry that answered, so handle_response/2 doesn't care who it was, or:
+  #   - the error itself, when only one entry was tried
+  #   - {:all_models_failed, [{entry, reason}, ...]} when several were
+  #   - :no_model_available when no entry's provider has an API key
   defp call_llm(system_prompt, user_content, operation, opts \\ []) do
-    started = System.monotonic_time(:millisecond)
+    entries = operation |> chain() |> Enum.map(&{&1, parse_spec(&1)})
+    deadline = System.monotonic_time(:millisecond) + chain_budget_ms()
 
-    case call_anthropix(system_prompt, user_content, operation, opts) do
-      {:error, :refused} when is_binary(user_content) ->
-        fallback(fallback_targets(), system_prompt, user_content, operation, opts, started)
-
-      result ->
-        result
-    end
-  end
-
-  defp fallback_targets do
-    if OpenRouter.configured?(), do: fallback_models(), else: []
-  end
-
-  defp fallback([], _system_prompt, _user_text, operation, _opts, _started) do
-    Logger.warning("Claude refused (#{operation}) and no fallback model is configured.")
-    {:error, :refused}
-  end
-
-  defp fallback(models, system_prompt, user_text, operation, opts, started) do
-    budget =
-      :japanese
-      |> Application.get_env(__MODULE__, [])
-      |> Keyword.get(:fallback_budget_ms, @default_fallback_budget_ms)
-
-    deadline = started + budget
-
-    Enum.reduce_while(models, {:error, :fallbacks_failed}, fn model, acc ->
+    entries
+    |> Enum.reduce_while([], fn {spec, target}, failures ->
       left = deadline - System.monotonic_time(:millisecond)
 
-      if left < @min_fallback_ms do
-        Logger.warning(
-          "Fallback #{model} (#{operation}) skipped: only #{left}ms of the time budget left."
-        )
+      cond do
+        not available?(target) ->
+          Logger.info("Skipping #{spec} (#{operation}): no API key for its provider.")
+          {:cont, failures}
 
-        {:halt, acc}
-      else
-        try_fallback(model, system_prompt, user_text, operation, opts, left, acc)
+        failures != [] and left < @min_attempt_ms ->
+          Logger.warning("Skipping #{spec} (#{operation}): only #{left}ms of the budget left.")
+          {:halt, failures}
+
+        true ->
+          timeout = min(left, receive_timeout())
+
+          case attempt(target, system_prompt, user_content, operation, opts, timeout) do
+            {:ok, response} ->
+              if failures != [] do
+                Logger.warning(
+                  "#{operation} answered by #{spec} after #{length(failures)} failed " <>
+                    "attempt(s): #{inspect(Enum.reverse(failures))}"
+                )
+              end
+
+              {:halt, {:ok, %{response | model: spec}}}
+
+            {:error, reason} ->
+              Logger.warning("#{spec} failed (#{operation}): #{inspect(reason)}")
+              {:cont, [{spec, reason} | failures]}
+          end
       end
     end)
+    |> case do
+      {:ok, response} -> {:ok, response}
+      [] -> {:error, :no_model_available}
+      [{_spec, reason}] -> {:error, reason}
+      failures -> {:error, {:all_models_failed, Enum.reverse(failures)}}
+    end
   end
 
-  defp try_fallback(model, system_prompt, user_text, operation, opts, left, acc) do
-    timeout = min(left, receive_timeout())
-    max_tokens = Keyword.get(opts, :max_tokens, 16_384)
+  defp available?({:anthropic, _model}) do
+    key = Application.get_env(:japanese, __MODULE__, [])[:api_key]
+    is_binary(key) and key != ""
+  end
 
-    case OpenRouter.chat(model, system_prompt, user_text,
-           max_tokens: max_tokens,
+  defp available?({:openrouter, _model}), do: OpenRouter.configured?()
+
+  defp attempt({:anthropic, model}, system_prompt, user_content, operation, opts, timeout) do
+    opts = opts |> Keyword.put(:model, model) |> Keyword.put(:receive_timeout, timeout)
+    call_anthropix(system_prompt, user_content, operation, opts)
+  end
+
+  defp attempt({:openrouter, model}, system_prompt, user_content, _operation, opts, timeout) do
+    case OpenRouter.chat(model, system_prompt, to_openai_content(user_content),
+           max_tokens: Keyword.get(opts, :max_tokens, 16_384),
            receive_timeout: timeout
          ) do
-      {:ok, completion} ->
-        Logger.warning(
-          "Claude refused (#{operation}); answered by fallback #{completion.model} instead."
-        )
-
-        {:halt, {:ok, completion_to_response(completion)}}
-
-      {:error, reason} ->
-        Logger.warning("Fallback #{model} (#{operation}) failed: #{inspect(reason)}")
-        {:cont, acc}
+      {:ok, completion} -> {:ok, completion_to_response(completion)}
+      {:error, reason} -> {:error, reason}
     end
+  end
+
+  # Anthropic content blocks in the OpenAI chat format OpenRouter speaks.
+  # Only the two block types this module sends: text and a base64 image.
+  defp to_openai_content(text) when is_binary(text), do: text
+
+  defp to_openai_content(blocks) when is_list(blocks) do
+    Enum.map(blocks, fn
+      %{type: "text", text: text} ->
+        %{type: "text", text: text}
+
+      %{type: "image", source: %{type: "base64", media_type: media_type, data: data}} ->
+        %{type: "image_url", image_url: %{url: "data:#{media_type};base64,#{data}"}}
+    end)
   end
 
   # An OpenRouter completion in the shape handle_response/2 expects.
@@ -513,6 +547,12 @@ defmodule Japanese.Translation do
     |> Keyword.get(:receive_timeout, @default_receive_timeout)
   end
 
+  defp chain_budget_ms do
+    :japanese
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:chain_budget_ms, @default_chain_budget_ms)
+  end
+
   defp log_refusal(raw_response, operation) do
     usage = Map.get(raw_response, "usage") || %{}
 
@@ -525,13 +565,13 @@ defmodule Japanese.Translation do
   end
 
   defp call_anthropix(system_prompt, user_text, operation, opts) do
-    client = build_client()
+    client = build_client(Keyword.fetch!(opts, :receive_timeout))
     retry = Keyword.get(opts, :retries, 3)
     max_tokens = Keyword.get(opts, :max_tokens, 16_384)
 
     Anthropix.chat(
       client,
-      model: model(operation),
+      model: Keyword.fetch!(opts, :model),
       messages: [
         %{role: "user", content: user_text}
       ],

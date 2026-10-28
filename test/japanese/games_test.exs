@@ -73,7 +73,7 @@ defmodule Japanese.GamesTest do
 
       Mimic.expect(Translation, :transcribe_screenshot, fn "fake jpeg", "image/jpeg", ocr_lines ->
         assert ocr_lines =~ "銅の槍"
-        {:ok, @reply}
+        {:ok, @reply, "openrouter/google/gemini-3.8-flash"}
       end)
 
       assert :ok = Processor.import_file(image_file(), "1718570", game: "ASTLIBRA")
@@ -82,6 +82,8 @@ defmodule Japanese.GamesTest do
       assert_receive {:shot_updated, %Shot{status: :done} = shot}, 2_000
 
       assert shot.description == "equipment menu"
+      # Records the chain entry that actually answered.
+      assert shot.model == "openrouter/google/gemini-3.8-flash"
       assert [%{"labels" => ["EQUIP"], "lines" => [%{"ja" => "銅の槍"}]}] = shot.sections
       assert {:ok, %Shot{status: :done, game: "ASTLIBRA"}} = Games.get_shot(shot.id)
 
