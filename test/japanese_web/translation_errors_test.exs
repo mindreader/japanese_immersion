@@ -40,4 +40,27 @@ defmodule Test.JapaneseWeb.TranslationErrors do
       refute_debris(TranslationErrors.explain_message(a_changeset()))
     end
   end
+
+  describe "translation_message/1" do
+    test "names a refusal instead of calling it an invalid response" do
+      assert TranslationErrors.translation_message(:refused) =~ "declined"
+      assert TranslationErrors.translation_message(:fallbacks_failed) =~ "fallback models"
+      refute TranslationErrors.translation_message(:refused) =~ "invalid"
+    end
+
+    test "is short and debris-free for any reason" do
+      for reason <- [
+            :refused,
+            :fallbacks_failed,
+            :timeout,
+            :crashed,
+            :invalid_response,
+            {:openrouter_http, 500, "boom"},
+            %RuntimeError{message: "boom"},
+            a_changeset()
+          ] do
+        refute_debris(TranslationErrors.translation_message(reason))
+      end
+    end
+  end
 end

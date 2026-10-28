@@ -16,6 +16,19 @@ defmodule Japanese.Translation do
   workload — bulk literal translation, judged mainly on faithfulness rather
   than creative quality — we're accepting that drift risk in exchange for not
   having to chase deprecations.
+
+  ## Refusals and the OpenRouter fallback
+
+  Claude occasionally declines a request outright (`stop_reason: "refusal"`),
+  sometimes on perfectly ordinary fiction. That is reported as
+  `{:error, :refused}` rather than as a malformed response, and if an
+  OpenRouter key is configured (`Japanese.OpenRouter`) the same prompt is then
+  tried on each of the `:fallback_models` in turn (see `fallback_models/0`).
+  The first one that answers wins. Game screenshots are not retried this way:
+  their request includes an image in Anthropic's format.
+
+  If every fallback also fails, the result is `{:error, :fallbacks_failed}`
+  (each attempt is logged).
   """
 
   require Logger
@@ -25,6 +38,20 @@ defmodule Japanese.Translation do
   # Switching to "claude-opus-5" for higher quality is a config-only change
   # (see `model/1`) if this default ever proves insufficient.
   @default_model "claude-sonnet-5-5"
+
+  # Tried in order, through OpenRouter, when Claude refuses. Two different
+  # vendors, so one provider's moderation can't block both. Override with
+  # `config :japanese, Japanese.Translation, fallback_models: [...]`; an empty
+  # list turns the fallback off.
+  @default_fallback_models ["google/gemini-3.8-flash", "deepseek/deepseek-v4.1-flash"]
+
+  # The fallback chain must finish inside the async translation ceiling
+  # (Japanese.Translation.Service.timeout_ms/0, 240s by default), counting the
+  # Claude call that refused. Each fallback's receive timeout is cut to what
+  # is left of this budget, and a fallback with under @min_fallback_ms left
+  # isn't started.
+  @default_fallback_budget_ms 220_000
+  @min_fallback_ms 20_000
 
   # A busy status/equipment screen came to ~1.9k output tokens on Sonnet 5.5
   # and ~3.3k on Sonnet 5 in testing; a dialogue box is far less. 8k leaves
@@ -66,15 +93,18 @@ defmodule Japanese.Translation do
           text: String.t()
         }
 
+  alias Japanese.OpenRouter
   alias Japanese.Schemas.Anthropic.Response
+  alias Japanese.Schemas.Anthropic.Response.{Content, Usage}
   alias Japanese.Translation.Json
 
   @enforce_keys [:text]
-  defstruct [:text, :usage]
+  defstruct [:text, :usage, :model]
 
   @type t :: %__MODULE__{
           text: String.t(),
-          usage: Japanese.Schemas.Anthropic.Response.Usage.t()
+          usage: Japanese.Schemas.Anthropic.Response.Usage.t(),
+          model: String.t() | nil
         }
 
   @doc """
@@ -92,7 +122,7 @@ defmodule Japanese.Translation do
 
     opts
     |> build_ja_to_en_prompt()
-    |> call_anthropix(text, :ja_to_en)
+    |> call_llm(text, :ja_to_en)
     |> handle_response(:ja_to_en)
   end
 
@@ -137,7 +167,7 @@ defmodule Japanese.Translation do
   def en_to_ja(text, opts \\ []) when is_binary(text) and is_list(opts) do
     opts
     |> build_en_to_ja_prompt()
-    |> call_anthropix(text, :en_to_ja)
+    |> call_llm(text, :en_to_ja)
     |> handle_response(:en_to_ja)
   end
 
@@ -170,7 +200,7 @@ defmodule Japanese.Translation do
 
     text
     |> cleanup()
-    |> then(&call_anthropix(system_prompt, &1, :explain))
+    |> then(&call_llm(system_prompt, &1, :explain))
     |> handle_response(:explain)
   end
 
@@ -210,7 +240,7 @@ defmodule Japanese.Translation do
     Conjugated form: #{ctx.conjugated_kanji} (#{ctx.conjugated_kana})
     """
 
-    call_anthropix(system_prompt, user, :explain)
+    call_llm(system_prompt, user, :explain)
     |> handle_response(:explain)
   end
 
@@ -314,6 +344,20 @@ defmodule Japanese.Translation do
     Map.get(models, operation) || Keyword.get(config, :model, @default_model)
   end
 
+  @doc """
+  OpenRouter model ids tried, in order, when Claude refuses a text request.
+
+  Configurable via `config :japanese, Japanese.Translation, fallback_models: [...]`;
+  defaults to #{inspect(@default_fallback_models)}. Only used when
+  `Japanese.OpenRouter` has an API key.
+  """
+  @spec fallback_models() :: [String.t()]
+  def fallback_models do
+    :japanese
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:fallback_models, @default_fallback_models)
+  end
+
   defp build_ja_to_en_prompt(opts) do
     literalness = Keyword.get(opts, :literalness, :literal)
     interleaved = Keyword.get(opts, :interleaved, false)
@@ -379,7 +423,108 @@ defmodule Japanese.Translation do
     )
   end
 
-  defp call_anthropix(system_prompt, user_text, operation, opts \\ []) do
+  # Claude first; if it refuses a plain-text request, the OpenRouter fallback
+  # chain. Returns the same {:ok, %Response{}} | {:error, reason} shape as
+  # call_anthropix/4, so handle_response/2 doesn't care who answered.
+  defp call_llm(system_prompt, user_content, operation, opts \\ []) do
+    started = System.monotonic_time(:millisecond)
+
+    case call_anthropix(system_prompt, user_content, operation, opts) do
+      {:error, :refused} when is_binary(user_content) ->
+        fallback(fallback_targets(), system_prompt, user_content, operation, opts, started)
+
+      result ->
+        result
+    end
+  end
+
+  defp fallback_targets do
+    if OpenRouter.configured?(), do: fallback_models(), else: []
+  end
+
+  defp fallback([], _system_prompt, _user_text, operation, _opts, _started) do
+    Logger.warning("Claude refused (#{operation}) and no fallback model is configured.")
+    {:error, :refused}
+  end
+
+  defp fallback(models, system_prompt, user_text, operation, opts, started) do
+    budget =
+      :japanese
+      |> Application.get_env(__MODULE__, [])
+      |> Keyword.get(:fallback_budget_ms, @default_fallback_budget_ms)
+
+    deadline = started + budget
+
+    Enum.reduce_while(models, {:error, :fallbacks_failed}, fn model, acc ->
+      left = deadline - System.monotonic_time(:millisecond)
+
+      if left < @min_fallback_ms do
+        Logger.warning(
+          "Fallback #{model} (#{operation}) skipped: only #{left}ms of the time budget left."
+        )
+
+        {:halt, acc}
+      else
+        try_fallback(model, system_prompt, user_text, operation, opts, left, acc)
+      end
+    end)
+  end
+
+  defp try_fallback(model, system_prompt, user_text, operation, opts, left, acc) do
+    timeout = min(left, receive_timeout())
+    max_tokens = Keyword.get(opts, :max_tokens, 16_384)
+
+    case OpenRouter.chat(model, system_prompt, user_text,
+           max_tokens: max_tokens,
+           receive_timeout: timeout
+         ) do
+      {:ok, completion} ->
+        Logger.warning(
+          "Claude refused (#{operation}); answered by fallback #{completion.model} instead."
+        )
+
+        {:halt, {:ok, completion_to_response(completion)}}
+
+      {:error, reason} ->
+        Logger.warning("Fallback #{model} (#{operation}) failed: #{inspect(reason)}")
+        {:cont, acc}
+    end
+  end
+
+  # An OpenRouter completion in the shape handle_response/2 expects.
+  defp completion_to_response(completion) do
+    %Response{
+      id: nil,
+      model: completion.model,
+      role: "assistant",
+      type: "message",
+      stop_reason: if(completion.finish_reason == "length", do: "max_tokens", else: "end_turn"),
+      content: [%Content{type: "text", text: completion.text}],
+      usage: %Usage{
+        input_tokens: completion.usage.input_tokens,
+        output_tokens: completion.usage.output_tokens
+      }
+    }
+  end
+
+  defp receive_timeout do
+    :japanese
+    |> Application.get_env(__MODULE__, [])
+    |> Keyword.get(:receive_timeout, @default_receive_timeout)
+  end
+
+  defp log_refusal(raw_response, operation) do
+    usage = Map.get(raw_response, "usage") || %{}
+
+    Logger.warning(
+      "Claude refused the request. Operation: #{operation}. " <>
+        "Model: #{inspect(Map.get(raw_response, "model"))}. " <>
+        "Content block types: #{inspect(Enum.map(Map.get(raw_response, "content") || [], &Map.get(&1, "type")))}. " <>
+        "Tokens in/out: #{inspect(Map.get(usage, "input_tokens"))}/#{inspect(Map.get(usage, "output_tokens"))}"
+    )
+  end
+
+  defp call_anthropix(system_prompt, user_text, operation, opts) do
     client = build_client()
     retry = Keyword.get(opts, :retries, 3)
     max_tokens = Keyword.get(opts, :max_tokens, 16_384)
@@ -394,6 +539,13 @@ defmodule Japanese.Translation do
       max_tokens: max_tokens
     )
     |> case do
+      # Checked before validation: a refusal usually has no content at all,
+      # which validation would otherwise report as a malformed response.
+      # With partial text it is still a failure, not a short translation.
+      {:ok, %{"stop_reason" => "refusal"} = anthropix_result} ->
+        log_refusal(anthropix_result, operation)
+        {:error, :refused}
+
       {:ok, anthropix_result} ->
         case Response.parse_response(anthropix_result) do
           {:ok, response} ->
@@ -506,7 +658,7 @@ defmodule Japanese.Translation do
 
       text ->
         check_stop_reason(response.stop_reason, response, :ja_to_en, text)
-        %__MODULE__{text: text, usage: response.usage}
+        %__MODULE__{text: text, usage: response.usage, model: response.model}
     end
   end
 

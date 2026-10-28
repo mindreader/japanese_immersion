@@ -28,4 +28,25 @@ defmodule JapaneseWeb.TranslationErrors do
   @spec explain_message(term()) :: String.t()
   def explain_message(_reason),
     do: "Failed to generate explanation. Please try again."
+
+  @doc """
+  User-facing message for a page translation that failed, shown on the page
+  with a Retry button. Refusals get their own wording, because retrying the
+  same model rarely helps and the details are only in the server log.
+  """
+  @spec translation_message(term()) :: String.t()
+  def translation_message(:refused),
+    do:
+      "Claude declined to translate this page. Set OPENROUTER_API_KEY to retry " <>
+        "refusals on other models."
+
+  def translation_message(:fallbacks_failed),
+    do:
+      "Claude declined to translate this page, and the fallback models failed too. " <>
+        "The server log has the details."
+
+  def translation_message(:timeout), do: "Translation timed out. Please try again."
+
+  def translation_message(_reason),
+    do: "Translation failed. Please try again; the server log has the details."
 end

@@ -54,7 +54,7 @@
       <% {:error, reason} -> %>
         <div class="flex flex-col items-center justify-center py-8">
           <div class="text-red-600 dark:text-red-400 mb-4">
-            Translation failed: {inspect(reason)}
+            {JapaneseWeb.TranslationErrors.translation_message(reason)}
           </div>
           <button
             phx-click="retry_translation"
