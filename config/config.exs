@@ -56,5 +56,3 @@ config :phoenix, :json_library, Jason
 import_config "#{config_env()}.exs"
 
 config :japanese, Japanese.TaskSupervisor, name: Japanese.Task.Supervisor
-
-config :tesla, disable_deprecated_builder_warning: true

@@ -88,4 +88,48 @@ defmodule Japanese.Games.VisionTest do
 
     assert {:ok, %{lines: []}} = Vision.annotate("jpeg bytes")
   end
+
+  describe "model" do
+    setup do
+      previous = Application.get_env(:japanese, Vision)
+      on_exit(fn -> Application.put_env(:japanese, Vision, previous || []) end)
+      :ok
+    end
+
+    test "unset, no model is sent and Google picks its default" do
+      Application.put_env(:japanese, Vision, api_key: "test-key")
+
+      Mimic.expect(Req, :post, fn _url, opts ->
+        assert [%{"type" => "DOCUMENT_TEXT_DETECTION"} = feature] =
+                 opts[:json] |> stringify() |> get_in(["requests", Access.at(0), "features"])
+
+        refute Map.has_key?(feature, "model")
+        {:ok, %Req.Response{status: 200, body: %{"responses" => [%{}]}}}
+      end)
+
+      assert Vision.model() == nil
+      assert {:ok, _} = Vision.annotate("jpeg bytes")
+    end
+
+    test "a configured model is sent with the feature" do
+      Application.put_env(:japanese, Vision, api_key: "test-key", model: "builtin/latest")
+
+      Mimic.expect(Req, :post, fn _url, opts ->
+        assert [%{"type" => "DOCUMENT_TEXT_DETECTION", "model" => "builtin/latest"}] =
+                 opts[:json] |> stringify() |> get_in(["requests", Access.at(0), "features"])
+
+        {:ok, %Req.Response{status: 200, body: %{"responses" => [%{}]}}}
+      end)
+
+      assert Vision.model() == "builtin/latest"
+      assert {:ok, _} = Vision.annotate("jpeg bytes")
+    end
+
+    test "an empty string (an unset env var) counts as unset" do
+      Application.put_env(:japanese, Vision, api_key: "test-key", model: "")
+      assert Vision.model() == nil
+    end
+  end
+
+  defp stringify(json), do: json |> Jason.encode!() |> Jason.decode!()
 end

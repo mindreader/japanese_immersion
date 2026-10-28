@@ -6,6 +6,10 @@ defmodule Japanese.Games.Vision do
   `config :japanese, Japanese.Games.Vision, api_key: ...` (the
   `GOOGLE_VISION_API_KEY` environment variable at runtime).
 
+  The OCR model is optional: `config :japanese, Japanese.Games.Vision,
+  model: "builtin/latest"` (or `GOOGLE_VISION_MODEL`). Unset, no model is
+  sent and Google uses its default, `builtin/stable`. See `model/0`.
+
   Vision is the authority on which characters are on screen; Claude only
   arranges and explains them (see `Japanese.Games.Pipeline`).
   """
@@ -53,6 +57,19 @@ defmodule Japanese.Games.Vision do
   def parse(other), do: {:error, {:vision_unexpected, other}}
 
   @doc """
+  The Vision OCR model to request, or `nil` for Google's default
+  (`builtin/stable`). Google's documented choices are `"builtin/stable"` and
+  `"builtin/latest"`; the value is passed through as-is.
+  """
+  @spec model() :: String.t() | nil
+  def model do
+    case Application.get_env(:japanese, __MODULE__, [])[:model] do
+      model when is_binary(model) and model != "" -> model
+      _ -> nil
+    end
+  end
+
+  @doc """
   Formats OCR lines for the model, one per line: `[x=10-200 y=30-52] text`.
   """
   @spec format_lines([line()]) :: String.t()
@@ -65,7 +82,7 @@ defmodule Japanese.Games.Vision do
       requests: [
         %{
           image: %{content: Base.encode64(image)},
-          features: [%{type: "DOCUMENT_TEXT_DETECTION"}],
+          features: [feature()],
           imageContext: %{languageHints: ["ja", "en"]}
         }
       ]
@@ -89,6 +106,13 @@ defmodule Japanese.Games.Vision do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp feature do
+    case model() do
+      nil -> %{type: "DOCUMENT_TEXT_DETECTION"}
+      model -> %{type: "DOCUMENT_TEXT_DETECTION", model: model}
     end
   end
 

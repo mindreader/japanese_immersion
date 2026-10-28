@@ -20,15 +20,13 @@ if System.get_env("PHX_SERVER") do
   config :japanese, JapaneseWeb.Endpoint, server: true
 end
 
-config :japanese, Japanese.Hume,
-  api_key: System.get_env("HUME_API_KEY"),
-  secret_key: System.get_env("HUME_SECRET_KEY")
-
-config :japanese, Japanese.Fal, api_key: System.get_env("FAL_API_KEY")
-
 # Google Cloud Vision OCR for game screenshots (an API key restricted to the
 # Vision API). Without it, screenshots are still found but fail to process.
-config :japanese, Japanese.Games.Vision, api_key: System.get_env("GOOGLE_VISION_API_KEY")
+# GOOGLE_VISION_MODEL is optional ("builtin/latest" or "builtin/stable");
+# unset, Google picks (builtin/stable).
+config :japanese, Japanese.Games.Vision,
+  api_key: System.get_env("GOOGLE_VISION_API_KEY"),
+  model: System.get_env("GOOGLE_VISION_MODEL")
 
 # Private key for SSH to the Steam Deck (its public half goes in the Deck's
 # ~/.ssh/authorized_keys). Unset: ~/.ssh/steamdeck_ed25519 if it exists,

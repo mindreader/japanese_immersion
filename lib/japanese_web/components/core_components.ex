@@ -683,7 +683,7 @@ defmodule JapaneseWeb.CoreComponents do
 
       <.action_menu id="page-menu">
         <:item patch={~p"/edit"}>Edit</:item>
-        <:item phx-click="generate" disabled={@generating}>Generate Audio</:item>
+        <:item phx-click="translate" disabled={@translating}>Translate</:item>
       </.action_menu>
   """
   attr :id, :string, required: true

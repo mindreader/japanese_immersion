@@ -804,31 +804,6 @@ let
         in
         drv;
 
-      tesla =
-        let
-          version = "1.22.0";
-          drv = buildMix {
-            inherit version;
-            name = "tesla";
-            appConfigPath = ./config;
-
-            src = fetchHex {
-              inherit version;
-              pkg = "tesla";
-              sha256 = "35330827f5b804073eda9792d4476b2834315c5e373e79c32d1e5ef08e607c50";
-            };
-
-            beamDeps = [
-              finch
-              jason
-              mime
-              mint
-              telemetry
-            ];
-          };
-        in
-        drv;
-
       thousand_island =
         let
           version = "1.6.0";

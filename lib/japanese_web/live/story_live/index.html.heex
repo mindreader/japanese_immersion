@@ -15,24 +15,9 @@
     >
       {story.name}
     </.link>
-    <.link
-      navigate={~p"/audio/#{story}"}
-      class="ml-2 text-purple-600 dark:text-purple-400 hover:underline"
-    >
-      Practice Audio
-    </.link>
     <.action_menu id={"story-menu-#{story.name}"} class="ml-2">
       <:item patch={~p"/stories/#{story}/edit"}>
         Edit
-      </:item>
-      <:item
-        phx-click="show_story_voice_selection"
-        phx-value-story={story.name}
-        disabled={Map.has_key?(@generating_story_audio, story.name)}
-      >
-        {if Map.has_key?(@generating_story_audio, story.name),
-          do: "Generating...",
-          else: "Generate Audio"}
       </:item>
       <:item
         phx-click={JS.push("delete", value: %{id: story.name}) |> hide("##{id}")}
@@ -61,77 +46,4 @@
     story={@story}
     patch={~p"/stories"}
   />
-</.modal>
-
-<.modal
-  :if={@voice_selection_story}
-  id="voice-selection-modal"
-  show
-  on_cancel={JS.push("close_story_voice_modal")}
->
-  <div class="space-y-4">
-    <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-      Select Voice for Audio Generation
-    </h3>
-    <p class="text-sm text-zinc-600 dark:text-zinc-400">
-      Choose a voice to generate audio for story '{@voice_selection_story}'
-    </p>
-
-    <div class="grid grid-cols-1 gap-3">
-      <button
-        phx-click="generate_story_audio"
-        phx-value-story={@voice_selection_story}
-        phx-value-voice="jf_alpha"
-        class="px-4 py-3 text-left border border-zinc-300 dark:border-zinc-600 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        type="button"
-      >
-        <div class="font-medium">Female - Alpha</div>
-        <div class="text-sm text-zinc-600 dark:text-zinc-400">jf_alpha</div>
-      </button>
-
-      <button
-        phx-click="generate_story_audio"
-        phx-value-story={@voice_selection_story}
-        phx-value-voice="jf_gongitsune"
-        class="px-4 py-3 text-left border border-zinc-300 dark:border-zinc-600 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        type="button"
-      >
-        <div class="font-medium">Female - Gongitsune</div>
-        <div class="text-sm text-zinc-600 dark:text-zinc-400">jf_gongitsune</div>
-      </button>
-
-      <button
-        phx-click="generate_story_audio"
-        phx-value-story={@voice_selection_story}
-        phx-value-voice="jf_nezumi"
-        class="px-4 py-3 text-left border border-zinc-300 dark:border-zinc-600 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        type="button"
-      >
-        <div class="font-medium">Female - Nezumi</div>
-        <div class="text-sm text-zinc-600 dark:text-zinc-400">jf_nezumi</div>
-      </button>
-
-      <button
-        phx-click="generate_story_audio"
-        phx-value-story={@voice_selection_story}
-        phx-value-voice="jf_tebukuro"
-        class="px-4 py-3 text-left border border-zinc-300 dark:border-zinc-600 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        type="button"
-      >
-        <div class="font-medium">Female - Tebukuro</div>
-        <div class="text-sm text-zinc-600 dark:text-zinc-400">jf_tebukuro</div>
-      </button>
-
-      <button
-        phx-click="generate_story_audio"
-        phx-value-story={@voice_selection_story}
-        phx-value-voice="jm_kumo"
-        class="px-4 py-3 text-left border border-zinc-300 dark:border-zinc-600 rounded-lg hover:bg-zinc-50 dark:hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        type="button"
-      >
-        <div class="font-medium">Male - Kumo</div>
-        <div class="text-sm text-zinc-600 dark:text-zinc-400">jm_kumo</div>
-      </button>
-    </div>
-  </div>
 </.modal>

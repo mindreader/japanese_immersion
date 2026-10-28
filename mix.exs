@@ -72,7 +72,6 @@ defmodule Japanese.MixProject do
       {:dialyxir, "~> 1.4", only: :dev, runtime: false},
       {:phoenix_pubsub, "~> 2.1"},
       {:deps_nix, "~> 3.0", only: :dev},
-      {:tesla, "~> 1.15"},
       {:finch, "~> 0.22"},
       {:briefly, "~> 0.5.1"},
       {:earmark, "~> 1.4"}

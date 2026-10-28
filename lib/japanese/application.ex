@@ -24,7 +24,7 @@ defmodule Japanese.Application do
          # Anthropic's logs), and fails only when receive_timeout expires as
          # %Req.TransportError{reason: :timeout}. 30s is safely under typical
          # server keep-alive windows (60-120s). This pool backs the Anthropic
-         # client (see Japanese.Translation) as well as Hume/Fal/storage.
+         # client (see Japanese.Translation), OpenRouter and Google Vision.
          default: [conn_max_idle_time: :timer.seconds(30)]
        }},
       {Task.Supervisor, name: Japanese.Task.Supervisor},
