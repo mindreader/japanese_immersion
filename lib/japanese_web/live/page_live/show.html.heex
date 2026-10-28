@@ -125,6 +125,54 @@
     <div class="markdown-content text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-3">
       {Phoenix.HTML.raw(@explanation)}
     </div>
+    <div
+      :for={{followup, i} <- Enum.with_index(@followups)}
+      id={"followup-#{i}"}
+      class="space-y-2 pt-4 border-t border-zinc-200 dark:border-zinc-700"
+    >
+      <p class="font-medium text-zinc-900 dark:text-zinc-100">{followup.question}</p>
+      <div
+        :if={followup.html}
+        class="markdown-content text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-3"
+      >
+        {Phoenix.HTML.raw(followup.html)}
+      </div>
+      <p :if={followup.error} class="text-sm text-red-600 dark:text-red-400">
+        {followup.error}
+      </p>
+      <p
+        :if={is_nil(followup.html) and is_nil(followup.error)}
+        class="text-sm italic text-zinc-500 dark:text-zinc-400"
+      >
+        Thinking…
+      </p>
+    </div>
+    <form
+      :if={@explain_markdown}
+      id="followup-form"
+      phx-submit="ask_followup"
+      class="flex gap-2"
+    >
+      <%!-- A new input per answered question, so it is cleared and (after the
+           first) focused, ready for the next one without the mouse. --%>
+      <input
+        id={"followup-question-#{Enum.count(@followups, &(&1.html || &1.error))}"}
+        phx-mounted={@followups != [] && JS.focus()}
+        type="text"
+        name="question"
+        autocomplete="off"
+        placeholder="Ask a follow-up…"
+        disabled={@followup_task != nil}
+        class="flex-1 rounded-lg border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+      />
+      <button
+        type="submit"
+        disabled={@followup_task != nil}
+        class="rounded-lg bg-green-600 text-white px-4 py-2 text-sm shadow hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-400 disabled:opacity-50"
+      >
+        Ask
+      </button>
+    </form>
     <div class="flex justify-end pt-4 border-t border-zinc-200 dark:border-zinc-700">
       <button
         phx-click="close_explanation_modal"

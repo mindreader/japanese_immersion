@@ -40,6 +40,8 @@ defmodule Japanese.OpenRouter do
 
   ## Options
     * `:max_tokens` (default 16_384)
+    * `:history` - earlier turns, `[%{role: "user" | "assistant", content: ...}]`,
+      oldest first, sent between the system prompt and `user_content`
     * `:receive_timeout` in ms (default 180_000)
   """
   @spec chat(String.t(), String.t(), String.t() | [map()], Keyword.t()) ::
@@ -50,10 +52,10 @@ defmodule Japanese.OpenRouter do
     with {:ok, key} <- api_key() do
       body = %{
         model: model,
-        messages: [
-          %{role: "system", content: system_prompt},
-          %{role: "user", content: user_content}
-        ],
+        messages:
+          [%{role: "system", content: system_prompt}] ++
+            Keyword.get(opts, :history, []) ++
+            [%{role: "user", content: user_content}],
         max_tokens: Keyword.get(opts, :max_tokens, 16_384),
         # Reasoning models: keep any thinking out of the reply text.
         reasoning: %{exclude: true}

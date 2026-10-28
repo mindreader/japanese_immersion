@@ -90,6 +90,24 @@ defmodule Test.Japanese.OpenRouter do
                )
     end
 
+    test "earlier turns go between the system prompt and the question" do
+      Mimic.expect(Req, :post, fn _url, opts ->
+        assert opts[:json].messages == [
+                 %{role: "system", content: "s"},
+                 %{role: "user", content: "猫"},
+                 %{role: "assistant", content: "cat"},
+                 %{role: "user", content: "why?"}
+               ]
+
+        {:ok, %Req.Response{status: 200, body: body(%{"content" => "Because."})}}
+      end)
+
+      assert {:ok, %{text: "Because."}} =
+               OpenRouter.chat("m", "s", "why?",
+                 history: [%{role: "user", content: "猫"}, %{role: "assistant", content: "cat"}]
+               )
+    end
+
     test "a non-200 response is an error with the provider's message" do
       Mimic.expect(Req, :post, fn _url, _opts ->
         {:ok,

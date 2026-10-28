@@ -14,6 +14,13 @@ defmodule JapaneseWeb.PageLive.Show do
        explaining: false,
        explanation: nil,
        explain_task: nil,
+       # Follow-up questions about the open explanation: the passage and the
+       # explanation's markdown (nil if it failed, so there is nothing to ask
+       # about), and each %{question, answer, html, error}, oldest first.
+       explain_passage: nil,
+       explain_markdown: nil,
+       followups: [],
+       followup_task: nil,
        translation_status: nil
      )}
   end
@@ -110,24 +117,23 @@ defmodule JapaneseWeb.PageLive.Show do
       explain_task_ref(socket) == ref ->
         Process.demonitor(ref, [:flush])
 
-        explanation =
+        {explanation, markdown} =
           case result do
-            {:ok, text} ->
-              # Parse markdown to HTML
-              case Earmark.as_html(text) do
-                {:ok, html, _messages} -> html
-                {:error, _html, _messages} -> text
-              end
-
-            {:error, error_message} ->
-              error_message
+            {:ok, text} -> {markdown_html(text), text}
+            {:error, error_message} -> {error_message, nil}
           end
 
         {:noreply,
          socket
          |> assign(:explaining, false)
          |> assign(:explain_task, nil)
-         |> assign(:explanation, explanation)}
+         |> assign(:explanation, explanation)
+         |> assign(:explain_markdown, markdown)
+         |> assign(:followups, [])}
+
+      followup_task_ref(socket) == ref ->
+        Process.demonitor(ref, [:flush])
+        {:noreply, finish_followup(socket, result)}
 
       true ->
         {:noreply, socket}
@@ -146,6 +152,10 @@ defmodule JapaneseWeb.PageLive.Show do
          |> assign(:explaining, false)
          |> assign(:explain_task, nil)
          |> assign(:explanation, TranslationErrors.explain_message(reason))}
+
+      followup_task_ref(socket) == ref ->
+        Logger.warning("Explain follow-up task crashed: #{inspect(reason)}")
+        {:noreply, finish_followup(socket, {:error, TranslationErrors.explain_message(reason)})}
 
       true ->
         {:noreply, socket}
@@ -181,8 +191,47 @@ defmodule JapaneseWeb.PageLive.Show do
     {:noreply,
      socket
      |> assign(:selected_text, selected_text)
+     |> assign(:explain_passage, selected_text)
      |> assign(:explaining, true)
      |> assign(:explain_task, task)}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("ask_followup", %{"question" => question}, socket) do
+    question = String.trim(question)
+
+    cond do
+      question == "" or socket.assigns.followup_task != nil or
+          socket.assigns.explain_markdown == nil ->
+        {:noreply, socket}
+
+      true ->
+        %{explain_passage: passage, explain_markdown: markdown, followups: followups} =
+          socket.assigns
+
+        # Only answered turns go back to the model; a failed one is left out.
+        turns =
+          for %{answer: answer} = f <- followups, is_binary(answer), do: {f.question, answer}
+
+        task =
+          Task.Supervisor.async_nolink(Japanese.TaskSupervisor.name(), fn ->
+            case Japanese.Translation.explain_followup(passage, markdown, turns, question) do
+              {:error, reason} ->
+                Logger.warning("Explain follow-up failed: #{inspect(reason)}")
+                {:error, TranslationErrors.explain_message(reason)}
+
+              answer when is_binary(answer) ->
+                {:ok, answer}
+            end
+          end)
+
+        followup = %{question: question, answer: nil, html: nil, error: nil}
+
+        {:noreply,
+         socket
+         |> assign(:followups, followups ++ [followup])
+         |> assign(:followup_task, task)}
+    end
   end
 
   @impl Phoenix.LiveView
@@ -200,7 +249,17 @@ defmodule JapaneseWeb.PageLive.Show do
 
   @impl Phoenix.LiveView
   def handle_event("close_explanation_modal", _params, socket) do
-    {:noreply, assign(socket, :explanation, nil)}
+    case socket.assigns.followup_task do
+      %Task{} = task -> Task.Supervisor.terminate_child(Japanese.TaskSupervisor.name(), task.pid)
+      nil -> :ok
+    end
+
+    {:noreply,
+     socket
+     |> assign(:explanation, nil)
+     |> assign(:explain_markdown, nil)
+     |> assign(:followups, [])
+     |> assign(:followup_task, nil)}
   end
 
   def handle_event("retry_translation", _params, socket) do
@@ -214,6 +273,35 @@ defmodule JapaneseWeb.PageLive.Show do
     case socket.assigns.explain_task do
       %Task{ref: ref} -> ref
       nil -> nil
+    end
+  end
+
+  defp followup_task_ref(socket) do
+    case socket.assigns.followup_task do
+      %Task{ref: ref} -> ref
+      nil -> nil
+    end
+  end
+
+  # Fills in the pending (last) follow-up with its answer or error.
+  defp finish_followup(socket, result) do
+    followups =
+      List.update_at(socket.assigns.followups, -1, fn followup ->
+        case result do
+          {:ok, answer} -> %{followup | answer: answer, html: markdown_html(answer)}
+          {:error, message} -> %{followup | error: message}
+        end
+      end)
+
+    socket
+    |> assign(:followups, followups)
+    |> assign(:followup_task, nil)
+  end
+
+  defp markdown_html(text) do
+    case Earmark.as_html(text) do
+      {:ok, html, _messages} -> html
+      {:error, _html, _messages} -> text
     end
   end
 end

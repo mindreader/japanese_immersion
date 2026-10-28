@@ -616,4 +616,57 @@ defmodule Test.Japanese.Translation do
       end
     end
   end
+
+  describe "explain_followup/4" do
+    test "sends the passage, the explanation and earlier turns, oldest first" do
+      Mimic.expect(Anthropix, :chat, fn _client, opts ->
+        assert opts[:messages] == [
+                 %{role: "user", content: "猫"},
+                 %{role: "assistant", content: "the breakdown"},
+                 %{role: "user", content: "first question"},
+                 %{role: "assistant", content: "first answer"},
+                 %{role: "user", content: "second question"}
+               ]
+
+        assert opts[:system] =~ "briefly"
+        assert opts[:max_tokens] == 2048
+        {:ok, @anthropix_response_en}
+      end)
+
+      assert "This is a test" =
+               Translation.explain_followup(
+                 "　猫　",
+                 "the breakdown",
+                 [{"first question", "first answer"}],
+                 "second question"
+               )
+    end
+
+    test "falls back through the chain with the same history" do
+      Mimic.stub(Japanese.OpenRouter, :configured?, fn -> true end)
+
+      Mimic.expect(Anthropix, :chat, fn _client, _opts ->
+        {:ok, Map.merge(@anthropix_response_en, %{"stop_reason" => "refusal", "content" => []})}
+      end)
+
+      Mimic.expect(Japanese.OpenRouter, :chat, fn _model, system, "why?", opts ->
+        assert system =~ "follow-up"
+
+        assert opts[:history] == [
+                 %{role: "user", content: "猫"},
+                 %{role: "assistant", content: "the breakdown"}
+               ]
+
+        {:ok,
+         %{
+           text: "Because.",
+           model: "m",
+           finish_reason: "stop",
+           usage: %{input_tokens: 1, output_tokens: 1}
+         }}
+      end)
+
+      assert "Because." = Translation.explain_followup("猫", "the breakdown", [], "why?")
+    end
+  end
 end

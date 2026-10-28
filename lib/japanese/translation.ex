@@ -74,6 +74,20 @@ defmodule Japanese.Translation do
 
   @operations [:ja_to_en, :en_to_ja, :explain, :screenshot]
 
+  # Follow-up questions about an explanation (explain_followup/4).
+  @followup_prompt """
+  You are helping an intermediate Japanese learner who is reading a story.
+  Earlier in this conversation you broke down a passage for them. Now they
+  have a follow-up question: about grammar, a reading or pronunciation,
+  nuance, word choice, or anything else about the passage.
+
+  Answer that question directly and briefly: usually two to five sentences,
+  with a short example if it helps. Give the reading (kana and romaji) of any
+  Japanese you bring up that wasn't in the breakdown. Don't repeat the
+  breakdown and don't use headers. If they ask for more detail, give more.
+  """
+  @followup_max_tokens 2048
+
   # The whole chain must finish inside the async translation ceiling
   # (Japanese.Translation.Service.timeout_ms/0, 240s by default). Each
   # attempt's receive timeout is cut to what is left of this budget, and once
@@ -216,7 +230,43 @@ defmodule Japanese.Translation do
   """
   @spec explain_text(String.t()) :: String.t() | {:error, term()}
   def explain_text(text) when is_binary(text) do
-    system_prompt = """
+    text
+    |> cleanup()
+    |> then(&call_llm(explain_prompt(), &1, :explain))
+    |> handle_response(:explain)
+  end
+
+  @doc """
+  Answers a follow-up question about an explanation from `explain_text/1`.
+
+  The model is given the conversation so far: the passage, its explanation,
+  and each earlier `{question, answer}` in `turns` (oldest first), then
+  `question`. Answers are asked to be brief: a few sentences, not another
+  full breakdown.
+
+  Returns the answer (markdown), or an error.
+  """
+  @spec explain_followup(String.t(), String.t(), [{String.t(), String.t()}], String.t()) ::
+          String.t() | {:error, term()}
+  def explain_followup(passage, explanation, turns, question)
+      when is_binary(passage) and is_binary(explanation) and is_list(turns) and
+             is_binary(question) do
+    history =
+      [
+        %{role: "user", content: cleanup(passage)},
+        %{role: "assistant", content: explanation}
+      ] ++
+        Enum.flat_map(turns, fn {q, a} ->
+          [%{role: "user", content: q}, %{role: "assistant", content: a}]
+        end)
+
+    @followup_prompt
+    |> call_llm(question, :explain, history: history, max_tokens: @followup_max_tokens)
+    |> handle_response(:explain)
+  end
+
+  defp explain_prompt do
+    """
     Break down this Japanese text into English, piece by piece. Use this format:
 
     **Example:**
@@ -235,11 +285,6 @@ defmodule Japanese.Translation do
     For multiple sentences, use "Sentence 1", "Sentence 2", etc. as headers.
     Include romaji, word-by-word breakdowns with readings and meanings, and full translations.
     """
-
-    text
-    |> cleanup()
-    |> then(&call_llm(system_prompt, &1, :explain))
-    |> handle_response(:explain)
   end
 
   @doc """
@@ -774,7 +819,8 @@ defmodule Japanese.Translation do
   defp attempt({:openrouter, model}, system_prompt, user_content, _operation, opts, timeout) do
     case OpenRouter.chat(model, system_prompt, to_openai_content(user_content),
            max_tokens: Keyword.get(opts, :max_tokens, 16_384),
-           receive_timeout: timeout
+           receive_timeout: timeout,
+           history: Keyword.get(opts, :history, [])
          ) do
       {:ok, completion} -> {:ok, completion_to_response(completion)}
       {:error, reason} -> {:error, reason}
@@ -842,9 +888,8 @@ defmodule Japanese.Translation do
     Anthropix.chat(
       client,
       model: Keyword.fetch!(opts, :model),
-      messages: [
-        %{role: "user", content: user_text}
-      ],
+      # Earlier turns of a conversation (explain_followup/4), oldest first.
+      messages: Keyword.get(opts, :history, []) ++ [%{role: "user", content: user_text}],
       system: system_prompt,
       max_tokens: max_tokens
     )
