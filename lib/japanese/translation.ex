@@ -31,13 +31,21 @@ defmodule Japanese.Translation do
   ## Pages every model refuses
 
   Content filters judge a whole request, so one passage can sink a page. When
-  every model in the chain refuses a page, it is split at paragraph breaks
-  into pieces of about 25 lines, which are translated separately (in
-  parallel, against the same time budget) and merged back by line number.
-  Lines from a piece that is refused too are saved untranslated
-  (`english: nil`) and show as "not translated" on the page. A refused piece
-  is not split any further: the aim is to keep the rest of the page, not to
-  get the refused passage past a filter.
+  every model in the chain refuses a page:
+
+  1. **Screen.** `Japanese.Translation.Screen` checks the page locally for
+     passages that pair sexual terms with a minor (the filters' usual
+     trigger). If it finds any, those lines are withheld, never sent, and
+     the rest of the page is sent once more as one request, keeping its
+     context.
+  2. **Pieces.** If the screen found nothing, or the screened page is refused
+     too, the (screened) page is split at paragraph breaks into pieces of
+     about 25 lines, translated separately (in parallel, against the same
+     time budget) and merged back by line number. A refused piece is not
+     split any further.
+
+  Withheld lines and lines of refused pieces are saved untranslated
+  (`english: nil`) and show as "not translated" on the page.
 
   A reply that comes back as prose instead of numbered lines (a model saying
   it can't help, rather than refusing outright) counts as a refusal too, so
@@ -121,6 +129,7 @@ defmodule Japanese.Translation do
         }
 
   alias Japanese.OpenRouter
+  alias Japanese.Translation.Screen
   alias Japanese.Schemas.Anthropic.Response
   alias Japanese.Schemas.Anthropic.Response.{Content, Usage}
   alias Japanese.Translation.Json
@@ -356,11 +365,11 @@ defmodule Japanese.Translation do
   Translates a page's Japanese text into the numbered reply that
   `Japanese.Translation.Json.format_to_translation_json/3` pairs with it.
 
-  The whole page is tried first. If every model refuses it, the page is
-  translated in pieces instead (see "Pages every model refuses" in the
-  moduledoc): the reply then holds only the lines of the pieces that were
-  translated, and the rest are saved untranslated. If every piece is refused
-  as well, the whole-page error is returned.
+  The whole page is tried first. If every model refuses it, the screened
+  page and then pieces are tried instead (see "Pages every model refuses" in
+  the moduledoc): the reply then holds only the lines that were translated,
+  and the rest are saved untranslated. If nothing gets through, the
+  whole-page error is returned.
   """
   @spec translate_page_text(String.t(), String.t()) :: {:ok, String.t()} | {:error, term()}
   def translate_page_text(japanese_text, label \\ "unidentified page")
@@ -373,9 +382,43 @@ defmodule Japanese.Translation do
         {:ok, reply}
 
       {:error, reason} = error ->
-        if refused?(reason),
-          do: translate_in_pieces(numbered, deadline, label, error),
-          else: error
+        if refused?(reason), do: after_refusal(numbered, deadline, label, error), else: error
+    end
+  end
+
+  # Every model refused the whole page: screen it, resend it once without the
+  # withheld lines, and fall back to pieces of whatever is left.
+  defp after_refusal(numbered, deadline, label, whole_page_error) do
+    case Screen.withhold(numbered) do
+      {_numbered, []} ->
+        Logger.warning("Every model refused #{label}; the screen found nothing to withhold.")
+        translate_in_pieces(numbered, deadline, label, whole_page_error)
+
+      {redacted, withheld} ->
+        Logger.warning(
+          "Every model refused #{label}; resending it once without lines " <>
+            "#{Screen.format_ranges(withheld)}, which the screen withheld."
+        )
+
+        translate_screened(redacted, deadline, label, whole_page_error)
+    end
+  end
+
+  defp translate_screened(redacted, deadline, label, whole_page_error) do
+    case line_numbers(redacted) do
+      [] ->
+        whole_page_error
+
+      numbers ->
+        case translate_numbered(redacted, deadline, :piece) do
+          {:ok, reply} ->
+            {:ok, reply |> numbered_reply_lines(numbers) |> Enum.join("\n")}
+
+          {:error, reason} = error ->
+            if refused?(reason),
+              do: translate_in_pieces(redacted, deadline, label, whole_page_error),
+              else: error
+        end
     end
   end
 
@@ -422,9 +465,7 @@ defmodule Japanese.Translation do
   defp translate_in_pieces(numbered, deadline, label, whole_page_error) do
     pieces = split_into_pieces(numbered)
 
-    Logger.warning(
-      "Every model refused #{label}; translating it in #{length(pieces)} pieces instead."
-    )
+    Logger.warning("Translating #{label} in #{length(pieces)} pieces instead.")
 
     results =
       pieces

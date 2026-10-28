@@ -1,0 +1,93 @@
+# Terms for Japanese.Translation.Screen, which decides which lines of a
+# refused page to withhold (never send) when it is retried.
+#
+# A line is withheld only when a sexual term (strong or weak) appears near a
+# sign of a minor: an age under 18 (13歳, 十三才, １３歳; detected in code, not
+# listed here) or one of the [youth] words. Strong terms count up to 8 lines
+# from that sign, weak ones up to 3. The withheld passage runs from one to
+# the other, plus a line either side.
+#
+# One term per line. Matching is a plain substring match after Unicode NFKC
+# normalisation (so half-width katakana match too), which means a stem covers
+# its conjugations: 抱い matches 抱いた and 抱いて. Lines starting with # are
+# comments. Edit freely; the file is read each time the screen runs.
+
+[strong]
+# Unambiguous on their own.
+セックス
+性交
+性行為
+性的
+初体験
+童貞
+処女
+夜伽
+破廉恥
+ハレンチ
+淫
+卑猥
+猥褻
+わいせつ
+エッチ
+えっち
+愛撫
+乳房
+おっぱい
+陰部
+股間
+勃起
+射精
+絶頂
+喘ぎ
+喘い
+強姦
+レイプ
+犯され
+犯して
+売春
+娼婦
+娼館
+媚薬
+孕
+交尾
+裸体
+全裸
+
+[weak]
+# Ordinary words that are sexual only in context.
+経験
+手を出
+抱い
+抱か
+抱き
+一緒に寝
+と寝た
+関係を持
+脱が
+脱い
+裸
+キス
+口づけ
+接吻
+妊娠
+身籠
+夜這い
+床を共に
+添い寝
+
+[youth]
+# Signs of a minor other than a stated age.
+少年
+少女
+子供
+子ども
+幼い
+幼女
+幼児
+未成年
+小学生
+中学生
+女児
+男児
+ロリ
+ショタ

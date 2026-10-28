@@ -525,4 +525,111 @@ defmodule Test.Japanese.Translation do
       refute Translation.refused?(:timeout)
     end
   end
+
+  describe "screening a refused page" do
+    # 60 lines, ten per paragraph; lines 25-26 are a passage the screen
+    # withholds (a minor's age next to a weak term). The mock "filter"
+    # refuses any request containing line 26.
+    @screened_page Enum.map_join(0..5, "\n\n\n", fn p ->
+                     Enum.map_join(1..10, "\n", fn i ->
+                       case p * 10 + i do
+                         25 -> "彼は十三歳だ。"
+                         26 -> "もう経験したのか。"
+                         n -> "これは#{n}行目です。"
+                       end
+                     end)
+                   end)
+
+    defp refuse_line_26(test) do
+      fn _client, opts ->
+        lines = request_lines(opts)
+        send(test, {:request, lines})
+
+        if Enum.any?(lines, &String.contains?(&1, "経験")),
+          do: {:ok, @refused},
+          else: {:ok, reply(translate_request(opts))}
+      end
+    end
+
+    test "withheld lines are never sent; the rest goes as one request" do
+      Mimic.stub(Anthropix, :chat, refuse_line_26(self()))
+
+      assert {:ok, text} = Translation.translate_page_text(@screened_page, "story page 1")
+
+      numbers =
+        for line <- String.split(text, "\n"),
+            do: line |> String.split("\t") |> hd() |> String.to_integer()
+
+      # The screen pads the passage by a line either side.
+      assert numbers == Enum.to_list(1..23) ++ Enum.to_list(28..60)
+
+      # The whole page, then the screened page in one request; no pieces.
+      assert_received {:request, whole}
+      assert length(whole) == 60
+      assert_received {:request, screened}
+      assert length(screened) == 56
+      refute Enum.any?(screened, &String.contains?(&1, "十三歳"))
+      refute_received {:request, _}
+    end
+
+    test "if the screened page is refused too, only screened pieces are sent" do
+      # Refuse anything with line 30 in it as well, which the screen misses.
+      # Pieces run in their own tasks, so requests go to the test process.
+      test = self()
+
+      Mimic.stub(Anthropix, :chat, fn _client, opts ->
+        lines = request_lines(opts)
+        send(test, {:request, lines})
+
+        if Enum.any?(lines, &String.contains?(&1, ["経験", "これは30行目"])),
+          do: {:ok, @refused},
+          else: {:ok, reply(translate_request(opts))}
+      end)
+
+      assert {:ok, text} = Translation.translate_page_text(@screened_page)
+
+      numbers =
+        for line <- String.split(text, "\n"),
+            do: line |> String.split("\t") |> hd() |> String.to_integer()
+
+      # The piece holding line 30 is lost; the withheld lines are too.
+      refute 30 in numbers
+      assert 1 in numbers and 60 in numbers
+      refute Enum.any?(24..27, &(&1 in numbers))
+
+      # After the whole page, nothing sent again contains a withheld line.
+      assert_received {:request, whole}
+      assert length(whole) == 60
+
+      for {:request, lines} <- collect_requests() do
+        refute Enum.any?(lines, &String.contains?(&1, ["十三歳", "経験"]))
+      end
+    end
+
+    test "the merged reply saves withheld lines as not translated" do
+      Mimic.stub(Anthropix, :chat, refuse_line_26(self()))
+
+      {:ok, text} = Translation.translate_page_text(@screened_page)
+
+      {:ok, %{translation: entries}} =
+        text
+        |> Translation.Json.format_to_translation_json(@screened_page)
+        |> Translation.Json.decode_translation()
+
+      lines = Enum.filter(entries, &Map.has_key?(&1, :japanese))
+      assert length(lines) == 60
+      assert Enum.at(lines, 24) == %{japanese: "彼は十三歳だ。", english: nil}
+      assert Enum.at(lines, 25) == %{japanese: "もう経験したのか。", english: nil}
+      assert Enum.at(lines, 22).english == "Line 23"
+      assert Enum.at(lines, 27).english == "Line 28"
+    end
+
+    defp collect_requests(acc \\ []) do
+      receive do
+        {:request, _} = msg -> collect_requests([msg | acc])
+      after
+        0 -> Enum.reverse(acc)
+      end
+    end
+  end
 end
