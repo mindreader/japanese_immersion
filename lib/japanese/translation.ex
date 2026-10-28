@@ -40,12 +40,12 @@ defmodule Japanese.Translation do
 
   # Sonnet first: cheaper than an Opus-class model with a much larger output
   # ceiling and a 1M context, which covers whole-page interleaved translation.
-  # Then the same model through OpenRouter, for an Anthropic API outage (it
-  # won't get past a refusal: OpenRouter moderates its Anthropic models).
-  # Then two other vendors, so one provider's moderation can't block both.
+  # Then two other vendors through OpenRouter, so one provider's moderation
+  # can't block both. (Listing "openrouter/anthropic/claude-sonnet-5.5" too
+  # would cover an Anthropic API outage, but not a refusal: OpenRouter
+  # moderates its Anthropic models.)
   @default_chain [
     "anthropic/claude-sonnet-5-5",
-    "openrouter/anthropic/claude-sonnet-5.5",
     "openrouter/google/gemini-3.8-flash",
     "openrouter/deepseek/deepseek-v4.1-flash"
   ]
