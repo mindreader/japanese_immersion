@@ -21,7 +21,14 @@ defmodule JapaneseWeb.PageControllerTest do
     Mimic.expect(Page, :get_japanese_text, 1, fn ^page -> {:ok, japanese_text} end)
 
     conn = get(conn, "/stories/#{story_name}/#{page_number}/japanese")
-    assert html_response(conn, 200) =~ japanese_text
+    html = html_response(conn, 200)
+    assert html =~ japanese_text
+
+    # One document: the root layout's, titled, with no <html> nested inside.
+    assert [_] = Regex.scan(~r/<html/, html)
+
+    assert html =~
+             ~r/<title[^>]*>\s*Japanese text of page 1 of test_story\s*· Japanese Immersion<\/title>/
   end
 
   test "returns 404 if story or page is not found", %{conn: conn} do

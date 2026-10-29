@@ -43,9 +43,10 @@ defmodule JapaneseWeb.StoryLive.IndexTest do
     stories = [story]
     Mimic.stub(Corpus, :list_stories, fn -> stories end)
     Mimic.stub(Story, :get_by_name, fn "story1" -> {:ok, story} end)
-    {:ok, _view, html} = live(conn, ~p"/stories/story1/edit")
+    {:ok, view, html} = live(conn, ~p"/stories/story1/edit")
     assert html =~ "#story-modal"
     assert html =~ "Edit Story"
+    assert page_title(view) == "Edit story1 · Japanese Immersion"
     assert html =~ "story1"
   end
 end

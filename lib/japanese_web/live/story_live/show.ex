@@ -37,7 +37,7 @@ defmodule JapaneseWeb.StoryLive.Show do
 
         {:noreply,
          socket
-         |> assign(:page_title, page_title(socket.assigns.live_action))
+         |> assign(:page_title, page_title(socket.assigns.live_action, story))
          |> assign(:story, story)
          |> assign(:pages, pages)
          |> assign(:edit_page_modal, false)
@@ -94,7 +94,7 @@ defmodule JapaneseWeb.StoryLive.Show do
 
           {:noreply,
            socket
-           |> assign(:page_title, page_title(socket.assigns.live_action))
+           |> assign(:page_title, page_title(socket.assigns.live_action, socket.assigns.story))
            |> assign(:pages, pages)
            |> assign(:edit_page_modal, false)
            |> assign(:new_page_modal, false)
@@ -179,7 +179,7 @@ defmodule JapaneseWeb.StoryLive.Show do
      |> push_patch(to: ~p"/stories/#{story.name}")}
   end
 
-  defp page_title(:show), do: "Show Story"
-  defp page_title(:edit), do: "Edit Story"
-  defp page_title(:add), do: "Add Page"
+  defp page_title(:show, story), do: story.name
+  defp page_title(:edit, story), do: "Edit #{story.name}"
+  defp page_title(:add, story), do: "Add page to #{story.name}"
 end

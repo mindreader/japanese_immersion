@@ -11,9 +11,9 @@ defmodule JapaneseWeb.StoryLive.ShowTest do
     story_name = "test_story"
     story = %Story{name: story_name}
     Mimic.expect(Story, :get_by_name, 2, fn ^story_name -> {:ok, story} end)
-    {:ok, _view, html} = live(conn, ~p"/stories/#{story}")
-    assert html =~ "Show Story"
+    {:ok, view, html} = live(conn, ~p"/stories/#{story}")
     assert html =~ story.name
+    assert page_title(view) == "test_story · Japanese Immersion"
   end
 
   test "redirects with error if story does not exist", %{conn: conn} do
