@@ -119,6 +119,18 @@ defmodule JapaneseWeb.PageLive.ExplainTest do
       assert render(view) =~ "<strong>猫</strong>"
     end
 
+    test "the dialog opens focused on its heading, not the box", %{view: view} do
+      html = render(view)
+
+      # JS.focus_first takes the first tabbable element: the heading has to
+      # come before the input, or phones open their keyboard on open.
+      {heading, _} = :binary.match(html, ~s(id="explanation-heading"))
+      {input, _} = :binary.match(html, ~s(name="question"))
+      assert heading < input
+      assert has_element?(view, ~s(#explanation-heading[tabindex="0"]))
+      assert has_element?(view, ~s(input[name="question"][phx-hook="FollowupFocus"]))
+    end
+
     test "a blank question sends nothing", %{view: view} do
       Mimic.reject(&Translation.explain_followup/4)
 

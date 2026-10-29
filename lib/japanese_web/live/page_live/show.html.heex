@@ -121,7 +121,16 @@
   on_cancel={JS.push("close_explanation_modal")}
 >
   <div class="space-y-4">
-    <h3 class="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Explanation</h3>
+    <%!-- The modal focuses the first tabbable thing in it when it opens
+         (JS.focus_first skips tabindex="-1"). This heading takes that, so a
+         phone doesn't open its keyboard and jump down to the follow-up box. --%>
+    <h3
+      id="explanation-heading"
+      tabindex="0"
+      class="text-lg font-semibold text-zinc-900 dark:text-zinc-100 focus:outline-none"
+    >
+      Explanation
+    </h3>
     <div class="markdown-content text-zinc-700 dark:text-zinc-300 leading-relaxed space-y-3">
       {Phoenix.HTML.raw(@explanation)}
     </div>
@@ -153,11 +162,12 @@
       phx-submit="ask_followup"
       class="flex gap-2"
     >
-      <%!-- A new input per answered question, so it is cleared and (after the
-           first) focused, ready for the next one without the mouse. --%>
+      <%!-- A new input per answered question, so it is cleared, and the
+           FollowupFocus hook focuses it on a desktop (not on a touch screen). --%>
       <input
         id={"followup-question-#{Enum.count(@followups, &(&1.html || &1.error))}"}
-        phx-mounted={@followups != [] && JS.focus()}
+        phx-hook="FollowupFocus"
+        data-scroll={to_string(@followups != [])}
         type="text"
         name="question"
         autocomplete="off"

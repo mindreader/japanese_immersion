@@ -290,6 +290,33 @@ Hooks.TextSelection = {
   }
 };
 
+// The Explain dialog's follow-up box. With a mouse and keyboard, focus it so
+// questions can be typed straight away. On a touch screen leave it alone:
+// focusing would pop up the on-screen keyboard and scroll the dialog down to
+// the box before the explanation has been read.
+//
+// When the dialog opens (data-scroll "false"), the modal's own focus-on-open
+// lands on the heading once the dialog is visible; this follows it to the
+// box, without scrolling, so the dialog stays at the top. (Focusing any
+// earlier does nothing: the dialog is still hidden.) After an answer the
+// dialog is already open, so focus directly, scrolling to the box, which
+// brings the answer above it into view.
+Hooks.FollowupFocus = {
+  mounted() {
+    if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return;
+
+    const opening = this.el.dataset.scroll !== "true";
+    const focus = () => this.el.focus({ preventScroll: opening });
+    const heading = document.getElementById("explanation-heading");
+
+    if (!opening || !heading || document.activeElement === heading) {
+      focus();
+    } else {
+      heading.addEventListener("focus", focus, { once: true });
+    }
+  }
+};
+
 Hooks.ScrollPosition = {
   mounted() {
     const key = `scroll-position:${window.location.pathname}`;
